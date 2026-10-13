@@ -134,20 +134,20 @@ def build_rule_trace(
 ) -> dict[str, object]:
     """JSON-safe trace so the UI can explain every number (T-11/T-13)."""
     return {
-        "demandPerDay": str(demand),
-        "coverDays": str(cover) if cover is not None else None,
+        "demandPerDay": ratio_str(demand),
+        "coverDays": ratio_str(cover) if cover is not None else None,
         "targetDays": target_days,
         "leadTimeDays": lead_days,
         "safetyDays": safety_days,
         "horizonDays": target_days + lead_days + safety_days,
-        "grossTargetUnits": str(gross),
-        "onHandUnits": str(stock),
-        "rawRequiredUnits": str(raw),
-        "minimumOrderUnits": str(minimum_order_units),
+        "grossTargetUnits": ratio_str(gross),
+        "onHandUnits": ratio_str(stock),
+        "rawRequiredUnits": ratio_str(raw),
+        "minimumOrderUnits": ratio_str(minimum_order_units),
         "purchasePackUnits": pack_size,
-        "roundedUnits": str(rounded_units),
+        "roundedUnits": ratio_str(rounded_units),
         "purchasePackCount": pack_count,
-        "excessUnits": str(excess_units),
+        "excessUnits": ratio_str(excess_units),
         "moqApplied": moq_applied,
         "formula": "raw = max(0, d*(T+L+B) - S); units = P * ceil(max(raw, MOQ) / P)",
     }
@@ -369,7 +369,8 @@ async def plan_detail(
     for line in plan.lines:
         product = products.get(line.product_id)
         supplier = suppliers.get(line.supplier_id)
-        units = effective_units(line)
+        precision = product.quantity_precision if product is not None else 0
+        units = quantize_quantity(effective_units(line), precision)
         pack = line.purchase_pack_units
         packs = int(units // pack) if pack > 0 else 0
         total = compute_line_total(units, line.unit_cost, line.currency)
@@ -419,8 +420,14 @@ async def plan_detail(
                 supplierId=line.supplier_id,
                 supplierName=supplier.name if supplier else "unknown",
                 selected=line.selected,
-                originalSuggestedBaseUnits=line.original_suggested_base_units,
-                editedBaseUnits=line.edited_base_units,
+                originalSuggestedBaseUnits=quantize_quantity(
+                    line.original_suggested_base_units, precision
+                ),
+                editedBaseUnits=(
+                    quantize_quantity(line.edited_base_units, precision)
+                    if line.edited_base_units is not None
+                    else None
+                ),
                 effectiveBaseUnits=units,
                 purchasePackUnits=pack,
                 purchasePackCount=packs,
