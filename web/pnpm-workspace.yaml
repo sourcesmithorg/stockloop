@@ -1,0 +1,4 @@
+# pnpm 10+ moved build-script approval out of package.json ("pnpm" field is ignored).
+# esbuild (via Vite) needs its postinstall to link the platform binary.
+allowBuilds:
+  esbuild: true
