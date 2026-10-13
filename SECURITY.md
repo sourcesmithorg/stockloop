@@ -7,18 +7,19 @@ earlier states are not provided; fix forward onto `main`.
 
 ## Reporting a Vulnerability
 
-**Do not open a public issue.**
+**Open a public GitHub issue** on this repository.
 
-Email [perdana.rizki16@gmail.com](mailto:perdana.rizki16@gmail.com) privately.
-We target acknowledgement within **48 hours**. The timeline for a fix will be
-agreed with you — we will not unilaterally decide your report is low priority.
+Issues are visible to everyone — including an attacker — the moment they
+are filed, so keep the report safe and useful:
 
-Please include:
-
-- Affected component (e.g. `api/` endpoint, `web/` UI, deployment config).
-- Reproduction steps — concrete enough to act on.
-- Impact — what an attacker gains or what breaks for users.
-- Suggested remediation, if you have one.
+- Do not include live credentials, tokens, or personal data. A minimal
+  reproduction with fictional values is enough.
+- Include the affected component (e.g. an `api/` endpoint, `web/` UI, or
+  deployment config), concrete reproduction steps, the impact (what an
+  attacker gains or what breaks for users), and a suggested remediation if
+  you have one.
+- A fix may be prepared in a private fork before the issue is updated, so
+  "no public fix yet" does not mean the report was ignored.
 
 ## Scope
 
