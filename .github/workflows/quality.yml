@@ -121,8 +121,9 @@ jobs:
           # Glob form: `*` matches any run of non-@/non-space characters.
           EXEMPTIONS = [
               # Owner address that remains legitimately in tracked content:
-              # CODE_OF_CONDUCT.md (enforcement contact) and
-              # docs/gcp-setup.md (gcloud auth list transcript evidence).
+              # docs/gcp-setup.md only (gcloud auth list transcript
+              # evidence). CODE_OF_CONDUCT.md routes reporting through
+              # GitHub and no longer publishes it.
               "perdana.rizki16@gmail.com",
               # GCP service-account identities — robots, not people.
               "*@*.iam.gserviceaccount.com",

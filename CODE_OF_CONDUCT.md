@@ -59,8 +59,13 @@ representative at an online or offline event.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-perdana.rizki16@gmail.com.
+reported to the community leaders responsible for enforcement by contacting
+the repository maintainers of the `@sourcesmithorg` organization through
+GitHub: use GitHub's built-in reporting tools (the "Report abuse" action on
+the offending comment, issue, or pull request) for the content itself, or
+open an issue in this repository asking a maintainer to make private
+contact so the report can be handled privately. Do not post personal
+contact details in public issues or pull requests.
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the

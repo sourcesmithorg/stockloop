@@ -72,9 +72,9 @@ title = "StockLoop gitleaks config"
   """
   regexes = [
     # Owner address that remains legitimately in tracked content:
-    # CODE_OF_CONDUCT.md (enforcement contact) and docs/gcp-setup.md
-    # (gcloud auth list transcript evidence). SECURITY.md no longer
-    # publishes it — reporting is a public issue now.
+    # docs/gcp-setup.md (gcloud auth list transcript evidence) only.
+    # CODE_OF_CONDUCT.md routes reporting through GitHub and no longer
+    # publishes it; SECURITY.md reports via public GitHub issues.
     '''(?i)perdana\.rizki16@gmail\.com$''',
     # SSH remote host in the README clone URL — not an email address.
     '''(?i)git@me\.github\.com$''',
