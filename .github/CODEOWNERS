@@ -1,22 +1,28 @@
-# CODEOWNERS — default-owner only until the team grows.
+# CODEOWNERS
 #
-# One team owns everything (`@sourcesmithorg`, the org this repo lives under).
-# No per-path rules yet — the maintainer's personal handle is intentionally
-# not used because an unverified handle would silently not match anyone.
-# As the team grows, split these by path.
+# Note: an organization handle (`@sourcesmithorg`) is NOT a valid owner.
+# GitHub accepts only a user handle (`@rizperdana`) or an org team
+# (`@org/team-name`). A bare org handle is silently ignored — it matches
+# nobody and provides zero review enforcement.
 
-* @sourcesmithorg
+# Default-owner only until the team grows.
+#
+# The verified maintainer account `@rizperdana` owns everything; it is
+# confirmed from commit history. When the org grows, create teams and
+# substitute `@sourcesmithorg/<team>`, then split these by path.
+
+* @rizperdana
 
 # Delivered reference material — read-only, must never be edited. Listed
 # explicitly so any change here gets immediate human attention; CI also
 # rejects PRs touching these paths.
-/.docs/ @sourcesmithorg
-/.template/ @sourcesmithorg
+/.docs/ @rizperdana
+/.template/ @rizperdana
 
 # CI is maintained separately from this changeset; listed so ownership of
 # the workflows is explicit rather than inherited by accident.
-/.github/workflows/ @sourcesmithorg
+/.github/workflows/ @rizperdana
 
 # Open business-policy questions live here. Listed explicitly because policy
 # changes are a maintainer judgment, not a routine PR.
-/docs/decisions/ @sourcesmithorg
+/docs/decisions/ @rizperdana
