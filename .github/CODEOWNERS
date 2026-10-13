@@ -1,0 +1,22 @@
+# CODEOWNERS — default-owner only until the team grows.
+#
+# One team owns everything (`@sourcesmithorg`, the org this repo lives under).
+# No per-path rules yet — the maintainer's personal handle is intentionally
+# not used because an unverified handle would silently not match anyone.
+# As the team grows, split these by path.
+
+* @sourcesmithorg
+
+# Delivered reference material — read-only, must never be edited. Listed
+# explicitly so any change here gets immediate human attention; CI also
+# rejects PRs touching these paths.
+/.docs/ @sourcesmithorg
+/.template/ @sourcesmithorg
+
+# CI is maintained separately from this changeset; listed so ownership of
+# the workflows is explicit rather than inherited by accident.
+/.github/workflows/ @sourcesmithorg
+
+# Open business-policy questions live here. Listed explicitly because policy
+# changes are a maintainer judgment, not a routine PR.
+/docs/decisions/ @sourcesmithorg

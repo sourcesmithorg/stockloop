@@ -1,0 +1,126 @@
+# deploy.yml — deploy the StockLoop API image to Google Cloud Run.
+#
+# Authentication is keyless Workload Identity Federation (OIDC): the
+# google-github-actions/auth action exchanges the job's short-lived OIDC
+# token for GCP credentials. A long-lived service-account JSON key in
+# GitHub secrets is a documented anti-pattern and is never used here
+# (this is a public repo). Secrets referenced by name only:
+#   GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT,
+#   GCP_PROJECT_ID, GCP_REGION
+#
+# No-op guard: the `check` job looks at (a) whether a deployable app exists
+# (api/Dockerfile) and (b) whether all four secrets are configured. If
+# either is missing it emits ::notice:: annotations naming what is absent
+# (secret NAMES only — values are never echoed) and the `deploy` job is
+# skipped. Today both are missing, so every run no-ops green.
+#
+# Pipeline once provisioned: build ./api with Docker, push to an Artifact
+# Registry repository (created if missing), `gcloud run deploy`. The
+# frontend is static and is not deployed from here; add its step when the
+# web scaffold defines a hosting path.
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false # never cancel an in-flight production deploy
+
+jobs:
+  check:
+    name: Check deploy preconditions
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Evaluate preconditions
+        id: check
+        env:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+        run: |
+          ready=true
+          if [ -f api/Dockerfile ]; then
+            echo "Deployable app found: api/Dockerfile"
+          else
+            ready=false
+            echo "::notice title=Deploy skipped::no deployable app yet (api/Dockerfile absent) — Cloud Run deploy activates when the backend scaffold and its Dockerfile land"
+          fi
+          missing=""
+          for var in GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT GCP_PROJECT_ID GCP_REGION; do
+            if [ -z "${!var}" ]; then
+              missing="${missing} ${var}"
+            fi
+          done
+          if [ -n "${missing}" ]; then
+            ready=false
+            # Secret NAMES only; values are never printed.
+            echo "::notice title=Deploy skipped::GCP is not provisioned yet — missing GitHub secrets:${missing}"
+          fi
+          echo "ready=${ready}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Build and deploy to Cloud Run
+    needs: check
+    if: needs.check.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for Workload Identity Federation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Authenticate to Google Cloud (keyless WIF)
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Build image and push to Artifact Registry
+        id: build
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+        run: |
+          repo=stockloop
+          image="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${repo}/stockloop-api:${GITHUB_SHA}"
+          if ! gcloud artifacts repositories describe "${repo}" --location "${GCP_REGION}" > /dev/null 2>&1; then
+            gcloud artifacts repositories create "${repo}" \
+              --repository-format docker \
+              --location "${GCP_REGION}" \
+              --description "StockLoop container images"
+          fi
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+          docker build --tag "${image}" ./api
+          docker push "${image}"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloud Run
+        env:
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+          IMAGE: ${{ steps.build.outputs.image }}
+        run: |
+          gcloud run deploy stockloop-api \
+            --image "${IMAGE}" \
+            --region "${GCP_REGION}" \
+            --platform managed \
+            --port 8080 \
+            --no-allow-unauthenticated # secure default; flip deliberately if a public API is wanted

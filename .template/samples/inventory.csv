@@ -1,0 +1,5 @@
+sku,product_name,stock_on_hand,snapshot_date,supplier_id
+SKU-001,Oat milk 1 L,12,2026-10-13,SUP-001
+SKU-002,Jasmine rice 1 kg,18,2026-10-13,SUP-001
+SKU-003,Instant noodles 85 g,32,2026-10-13,SUP-002
+SKU-004,Sparkling water 500 ml,24,2026-10-13,SUP-002

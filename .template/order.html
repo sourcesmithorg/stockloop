@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+  <meta content="StockLoop static HTML UI template. Demo data only; no business logic." name="description"/>
+  <title>
+   Purchase-order preview &middot; StockLoop template
+  </title>
+  <link href="assets/loop.svg" rel="icon" type="image/svg+xml"/>
+  <link href="assets/styles.css" rel="stylesheet"/>
+ </head>
+ <body>
+  <a class="skip-link" href="#main-content">
+   Skip to content
+  </a>
+  <svg aria-hidden="true" class="sr-only" height="0" width="0" xmlns="http://www.w3.org/2000/svg">
+   <symbol id="i-grid" viewbox="0 0 24 24">
+    <rect height="7" rx="1.5" width="7" x="3" y="3">
+    </rect>
+    <rect height="7" rx="1.5" width="7" x="14" y="3">
+    </rect>
+    <rect height="7" rx="1.5" width="7" x="3" y="14">
+    </rect>
+    <rect height="7" rx="1.5" width="7" x="14" y="14">
+    </rect>
+   </symbol>
+   <symbol id="i-box" viewbox="0 0 24 24">
+    <path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7 5.8l9 5">
+    </path>
+   </symbol>
+   <symbol id="i-spark" viewbox="0 0 24 24">
+    <path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5zM20 3v4M18 5h4">
+    </path>
+   </symbol>
+   <symbol id="i-file" viewbox="0 0 24 24">
+    <path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6">
+    </path>
+   </symbol>
+   <symbol id="i-truck" viewbox="0 0 24 24">
+    <path d="M3 5h11v12H3zM14 9h4l3 4v4h-7">
+    </path>
+    <circle cx="7" cy="18" r="2">
+    </circle>
+    <circle cx="18" cy="18" r="2">
+    </circle>
+   </symbol>
+   <symbol id="i-upload" viewbox="0 0 24 24">
+    <path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6">
+    </path>
+   </symbol>
+   <symbol id="i-settings" viewbox="0 0 24 24">
+    <path d="m10 3-1 3-3 1-3 3 1 3-1 3 3 3 3 1 1 3h4l1-3 3-1 3-3-1-3 1-3-3-3-3-1-1-3z">
+    </path>
+    <circle cx="12" cy="13" r="3">
+    </circle>
+   </symbol>
+   <symbol id="i-chevron" viewbox="0 0 24 24">
+    <path d="m8 10 4 4 4-4">
+    </path>
+   </symbol>
+   <symbol id="i-right" viewbox="0 0 24 24">
+    <path d="M4 12h16m-6-6 6 6-6 6">
+    </path>
+   </symbol>
+   <symbol id="i-left" viewbox="0 0 24 24">
+    <path d="M20 12H4m6-6-6 6 6 6">
+    </path>
+   </symbol>
+   <symbol id="i-search" viewbox="0 0 24 24">
+    <circle cx="10.5" cy="10.5" r="6.5">
+    </circle>
+    <path d="m16 16 5 5">
+    </path>
+   </symbol>
+   <symbol id="i-bell" viewbox="0 0 24 24">
+    <path d="M18 8a6 6 0 0 0-12 0c0 8-3 8-3 10h18c0-2-3-2-3-10M10 21h4">
+    </path>
+   </symbol>
+   <symbol id="i-plus" viewbox="0 0 24 24">
+    <path d="M12 5v14M5 12h14">
+    </path>
+   </symbol>
+   <symbol id="i-check" viewbox="0 0 24 24">
+    <path d="m5 12 4 4L19 6">
+    </path>
+   </symbol>
+   <symbol id="i-check-circle" viewbox="0 0 24 24">
+    <circle cx="12" cy="12" r="9">
+    </circle>
+    <path d="m8 12 3 3 5-6">
+    </path>
+   </symbol>
+   <symbol id="i-info" viewbox="0 0 24 24">
+    <circle cx="12" cy="12" r="9">
+    </circle>
+    <path d="M12 10v7M12 6h.01">
+    </path>
+   </symbol>
+   <symbol id="i-warn" viewbox="0 0 24 24">
+    <path d="m12 3 10 18H2zM12 9v5M12 17h.01">
+    </path>
+   </symbol>
+   <symbol id="i-clock" viewbox="0 0 24 24">
+    <circle cx="12" cy="12" r="9">
+    </circle>
+    <path d="M12 7v5l3 2">
+    </path>
+   </symbol>
+   <symbol id="i-globe" viewbox="0 0 24 24">
+    <circle cx="12" cy="12" r="9">
+    </circle>
+    <path d="M3 12h18M12 3c-5 5-5 13 0 18 5-5 5-13 0-18">
+    </path>
+   </symbol>
+   <symbol id="i-filter" viewbox="0 0 24 24">
+    <path d="M4 7h16M7 12h10M10 17h4">
+    </path>
+   </symbol>
+   <symbol id="i-download" viewbox="0 0 24 24">
+    <path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5">
+    </path>
+   </symbol>
+   <symbol id="i-refresh" viewbox="0 0 24 24">
+    <path d="M20 7V3m0 4h-4M4 17v4m0-4h4M20 7a9 9 0 0 0-16 2M4 17a9 9 0 0 0 16-2">
+    </path>
+   </symbol>
+   <symbol id="i-mail" viewbox="0 0 24 24">
+    <rect height="14" rx="2" width="18" x="3" y="5">
+    </rect>
+    <path d="m3 6 9 7 9-7">
+    </path>
+   </symbol>
+   <symbol id="i-store" viewbox="0 0 24 24">
+    <path d="M3 9 5 3h14l2 6M4 10v11h16V10M8 21v-7h5v7">
+    </path>
+    <path d="M3 9c0 4 6 4 6 0 0 4 6 4 6 0 0 4 6 4 6 0M9 3v6M15 3v6">
+    </path>
+   </symbol>
+   <symbol id="i-menu" viewbox="0 0 24 24">
+    <path d="M4 6h16M4 12h16M4 18h16">
+    </path>
+   </symbol>
+   <symbol id="i-help" viewbox="0 0 24 24">
+    <circle cx="12" cy="12" r="9">
+    </circle>
+    <path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 5M12 18h.01">
+    </path>
+   </symbol>
+   <symbol id="i-logout" viewbox="0 0 24 24">
+    <path d="M9 3H3v18h6M8 12h13m-5-5 5 5-5 5">
+    </path>
+   </symbol>
+   <symbol id="i-layers" viewbox="0 0 24 24">
+    <path d="m12 3 10 6-10 6L2 9zM2 14l10 6 10-6">
+    </path>
+   </symbol>
+   <symbol id="i-lock" viewbox="0 0 24 24">
+    <rect height="11" rx="2" width="16" x="4" y="10">
+    </rect>
+    <path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3">
+    </path>
+   </symbol>
+   <symbol id="i-edit" viewbox="0 0 24 24">
+    <path d="m16 3 5 5-12 12-6 1 1-6zM13 6l5 5">
+    </path>
+   </symbol>
+   <symbol id="i-arrow-up" viewbox="0 0 24 24">
+    <path d="M12 19V5m-6 6 6-6 6 6">
+    </path>
+   </symbol>
+   <symbol id="i-external" viewbox="0 0 24 24">
+    <path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7">
+    </path>
+   </symbol>
+   <symbol id="i-close" viewbox="0 0 24 24">
+    <path d="m6 6 12 12M18 6 6 18">
+    </path>
+   </symbol>
+   <symbol id="i-print" viewbox="0 0 24 24">
+    <path d="M6 8V3h12v5M6 17H3V8h18v9h-3M6 13h12v8H6zM17 10h.01">
+    </path>
+   </symbol>
+   <symbol id="i-shield" viewbox="0 0 24 24">
+    <path d="m12 3 8 3v6c0 5-8 9-8 9S4 17 4 12V6zM8 12l3 3 5-6">
+    </path>
+   </symbol>
+   <symbol id="i-wallet" viewbox="0 0 24 24">
+    <path d="M21 7H3V4h15v3M3 7v14h18V7M21 11h-7v6h7M17 14h.01">
+    </path>
+   </symbol>
+   <symbol id="i-chart" viewbox="0 0 24 24">
+    <path d="M4 3v18h17M8 16v-4M13 16V7M18 16v-6">
+    </path>
+   </symbol>
+   <symbol id="i-pause" viewbox="0 0 24 24">
+    <path d="M8 5v14M16 5v14">
+    </path>
+   </symbol>
+   <symbol id="i-trash" viewbox="0 0 24 24">
+    <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7">
+    </path>
+   </symbol>
+  </svg>
+  <!-- COMPONENT: app-sidebar -->
+  <aside aria-label="Main navigation" class="sidebar" data-component="app-sidebar">
+   <a aria-label="StockLoop overview" class="brand" href="index.html">
+    <img alt="" height="33" src="assets/loop.svg" width="33"/>
+    stockloop
+    <span class="sr-only">
+     template
+    </span>
+   </a>
+   <a class="workspace-button" href="settings.html#store">
+    <span class="workspace-initial">
+     M
+    </span>
+    <span>
+     <strong>
+      Maple &amp; Main
+     </strong>
+     <small>
+      Neighborhood market
+     </small>
+    </span>
+    <svg aria-hidden="true" class="icon">
+     <use href="#i-chevron">
+     </use>
+    </svg>
+   </a>
+   <ul class="nav-list">
+    <li>
+     <a class="nav-link" href="index.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-grid">
+       </use>
+      </svg>
+      <span>
+       Overview
+      </span>
+     </a>
+    </li>
+    <li>
+     <a class="nav-link" href="inventory.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-box">
+       </use>
+      </svg>
+      <span>
+       Inventory
+      </span>
+     </a>
+    </li>
+    <li>
+     <a class="nav-link" href="reorder.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-spark">
+       </use>
+      </svg>
+      <span>
+       Reorder studio
+      </span>
+      <span class="count">
+       4
+      </span>
+     </a>
+    </li>
+    <li>
+     <a aria-current="page" class="nav-link" href="orders.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-file">
+       </use>
+      </svg>
+      <span>
+       Purchase orders
+      </span>
+      <span class="count">
+       2
+      </span>
+     </a>
+    </li>
+    <li>
+     <a class="nav-link" href="suppliers.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-truck">
+       </use>
+      </svg>
+      <span>
+       Suppliers
+      </span>
+     </a>
+    </li>
+    <li>
+     <a class="nav-link" href="imports.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-upload">
+       </use>
+      </svg>
+      <span>
+       Data imports
+      </span>
+     </a>
+    </li>
+   </ul>
+   <div class="sidebar-bottom">
+    <div class="sidebar-note">
+     <strong>
+      Good stock. Less guesswork.
+     </strong>
+     Your shelf, one step ahead.
+    </div>
+    <a class="nav-link" href="settings.html">
+     <svg aria-hidden="true" class="icon">
+      <use href="#i-settings">
+      </use>
+     </svg>
+     <span>
+      Settings
+     </span>
+    </a>
+    <a class="nav-link" href="states.html">
+     <svg aria-hidden="true" class="icon">
+      <use href="#i-layers">
+      </use>
+     </svg>
+     <span>
+      Template states
+     </span>
+    </a>
+    <a class="sidebar-profile" href="settings.html#account">
+     <span class="avatar">
+      JL
+     </span>
+     <span>
+      <strong>
+       Jamie Lee
+      </strong>
+      <small>
+       Store owner &middot; Demo account
+      </small>
+     </span>
+    </a>
+   </div>
+  </aside>
+  <!-- COMPONENT: mobile-navigation -->
+  <nav aria-label="Mobile navigation" class="mobile-nav-landmark" data-component="mobile-navigation">
+   <details class="mobile-nav">
+    <summary>
+     <span class="brand">
+      <img alt="" height="33" src="assets/loop.svg" width="33"/>
+      stockloop
+     </span>
+     <span class="row small">
+      Menu
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-menu">
+       </use>
+      </svg>
+     </span>
+    </summary>
+    <ul class="nav-list">
+     <li>
+      <a class="nav-link" href="index.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-grid">
+        </use>
+       </svg>
+       <span>
+        Overview
+       </span>
+      </a>
+     </li>
+     <li>
+      <a class="nav-link" href="inventory.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-box">
+        </use>
+       </svg>
+       <span>
+        Inventory
+       </span>
+      </a>
+     </li>
+     <li>
+      <a class="nav-link" href="reorder.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-spark">
+        </use>
+       </svg>
+       <span>
+        Reorder studio
+       </span>
+       <span class="count">
+        4
+       </span>
+      </a>
+     </li>
+     <li>
+      <a aria-current="page" class="nav-link" href="orders.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-file">
+        </use>
+       </svg>
+       <span>
+        Purchase orders
+       </span>
+       <span class="count">
+        2
+       </span>
+      </a>
+     </li>
+     <li>
+      <a class="nav-link" href="suppliers.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-truck">
+        </use>
+       </svg>
+       <span>
+        Suppliers
+       </span>
+      </a>
+     </li>
+     <li>
+      <a class="nav-link" href="imports.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-upload">
+        </use>
+       </svg>
+       <span>
+        Data imports
+       </span>
+      </a>
+     </li>
+    </ul>
+    <a class="nav-link" href="settings.html">
+     <svg aria-hidden="true" class="icon">
+      <use href="#i-settings">
+      </use>
+     </svg>
+     Settings
+    </a>
+    <a class="nav-link" href="states.html">
+     <svg aria-hidden="true" class="icon">
+      <use href="#i-layers">
+      </use>
+     </svg>
+     Template states
+    </a>
+   </details>
+  </nav>
+  <div class="app-main">
+   <!-- COMPONENT: app-header -->
+   <header class="app-header" data-component="app-header">
+    <div class="breadcrumb">
+     <span>
+      Workspace
+     </span>
+     <svg aria-hidden="true" class="icon sm">
+      <use href="#i-right">
+      </use>
+     </svg>
+     <strong>
+      Purchase-order preview
+     </strong>
+    </div>
+    <div class="header-tools">
+     <span class="pill outline">
+      Demo data
+     </span>
+     <a class="header-locale" href="settings.html#region">
+      EN / USD
+     </a>
+     <a aria-label="View sample notifications" class="icon-btn" href="states.html#notifications">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-bell">
+       </use>
+      </svg>
+     </a>
+     <a aria-label="Jamie Lee account" href="settings.html#account">
+      <span class="avatar header-avatar">
+       JL
+      </span>
+     </a>
+    </div>
+   </header>
+   <main class="main" id="main-content">
+    <!-- COMPONENT: page-heading -->
+    <div class="page-head" data-component="page-heading">
+     <div>
+      <p class="eyebrow">
+       Purchase-order preview
+      </p>
+      <h1>
+       One supplier. One clear order.
+      </h1>
+      <p class="description">
+       Printable document composition, with separate export states.
+      </p>
+     </div>
+     <div class="page-head-actions">
+      <a class="btn" href="orders.html">
+       <svg aria-hidden="true" class="icon sm">
+        <use href="#i-left">
+        </use>
+       </svg>
+       Back to orders
+      </a>
+      <a class="btn primary" href="states.html#export-success">
+       <svg aria-hidden="true" class="icon sm">
+        <use href="#i-download">
+        </use>
+       </svg>
+       Export success fixture
+      </a>
+     </div>
+    </div>
+    <div class="document-wrap">
+     <div class="print-hide mb-24">
+      <div class="inline-note info">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-info">
+        </use>
+       </svg>
+       <div>
+        <strong>
+         Document preview only.
+        </strong>
+        <p>
+         Approval and amounts are fixed sample data. Use your browser&rsquo;s Print command to inspect the print stylesheet; application PDF/CSV generation is not included.
+        </p>
+       </div>
+      </div>
+     </div>
+     <!-- COMPONENT: purchase-order-document -->
+     <article aria-labelledby="po-heading" class="document" data-component="purchase-order-document">
+      <div class="document-top">
+       <div>
+        <a aria-label="StockLoop overview" class="brand" href="index.html">
+         <img alt="" height="33" src="assets/loop.svg" width="33"/>
+         stockloop
+         <span class="sr-only">
+          template
+         </span>
+        </a>
+        <p class="small muted mt-8">
+         Maple &amp; Main neighborhood market
+        </p>
+       </div>
+       <div>
+        <p class="eyebrow">
+         Purchase order
+        </p>
+        <h2 class="document-title mt-8" id="po-heading">
+         PO-2026-0142
+        </h2>
+        <div class="mt-8">
+         <span class="pill good">
+          <svg aria-hidden="true" class="icon">
+           <use href="#i-check">
+           </use>
+          </svg>
+          Approved fixture
+         </span>
+        </div>
+       </div>
+      </div>
+      <div class="document-parties">
+       <section>
+        <h3>
+         Order from
+        </h3>
+        <address>
+         <strong>
+          Maple &amp; Main
+         </strong>
+         <br/>
+         42 Orchard Avenue
+         <br/>
+         Portland, OR 97205, United States
+         <br/>
+         Jamie Lee &middot; orders@example.test
+        </address>
+       </section>
+       <section>
+        <h3>
+         Order to
+        </h3>
+        <address>
+         <strong>
+          Freshfield Foods
+         </strong>
+         <br/>
+         120 Market Street
+         <br/>
+         Portland, OR 97209, United States
+         <br/>
+         Alex Morgan &middot; supply@example.test
+        </address>
+       </section>
+      </div>
+      <dl class="document-meta">
+       <div>
+        <dt>
+         Order date
+        </dt>
+        <dd>
+         Oct 13, 2026
+        </dd>
+       </div>
+       <div>
+        <dt>
+         Requested delivery
+        </dt>
+        <dd>
+         To confirm &middot; Monday to Friday
+        </dd>
+       </div>
+       <div>
+        <dt>
+         Currency
+        </dt>
+        <dd>
+         USD &middot; US dollar
+        </dd>
+       </div>
+       <div>
+        <dt>
+         Payment terms
+        </dt>
+        <dd>
+         Net 14 days
+        </dd>
+       </div>
+      </dl>
+      <div aria-label="Purchase-order items for Freshfield Foods" class="table-scroll" role="region" tabindex="0">
+       <!-- COMPONENT: data-table -->
+       <table class="data-table doc-table" data-component="data-table">
+        <caption class="sr-only">
+         Purchase-order items for Freshfield Foods
+        </caption>
+        <thead>
+         <tr>
+          <th scope="col">
+           Product
+          </th>
+          <th scope="col">
+           Purchase packs
+          </th>
+          <th class="num" scope="col">
+           Base units
+          </th>
+          <th class="num" scope="col">
+           Unit cost
+          </th>
+          <th class="num" scope="col">
+           Line total
+          </th>
+         </tr>
+        </thead>
+        <tbody>
+         <tr>
+          <td>
+           <div class="product-line">
+            <img alt="" class="product-thumb" height="48" src="assets/product-oat.svg" width="42"/>
+            <div>
+             <a class="product-name" href="product.html">
+              Oat milk &middot; 1 L
+             </a>
+             <span class="sub mono">
+              SKU-001
+             </span>
+            </div>
+           </div>
+          </td>
+          <td>
+           4 cases &times; 12
+          </td>
+          <td class="num">
+           48
+          </td>
+          <td class="num">
+           $2.50
+          </td>
+          <td class="num">
+           $120.00
+          </td>
+         </tr>
+         <tr>
+          <td>
+           <div class="product-line">
+            <img alt="" class="product-thumb" height="48" src="assets/product-rice.svg" width="42"/>
+            <div>
+             <span class="product-name">
+              Jasmine rice &middot; 1 kg
+             </span>
+             <span class="sub mono">
+              SKU-002
+             </span>
+            </div>
+           </div>
+          </td>
+          <td>
+           5 cases &times; 6
+          </td>
+          <td class="num">
+           30
+          </td>
+          <td class="num">
+           $4.00
+          </td>
+          <td class="num">
+           $120.00
+          </td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+      <div class="document-totals">
+       <dl class="facts numeric">
+        <div>
+         <dt>
+          Items subtotal
+         </dt>
+         <dd>
+          $240.00
+         </dd>
+        </div>
+        <div>
+         <dt>
+          Shipping
+         </dt>
+         <dd>
+          Not included
+         </dd>
+        </div>
+        <div>
+         <dt>
+          Tax
+         </dt>
+         <dd>
+          Not calculated
+         </dd>
+        </div>
+        <div>
+         <dt>
+          <span class="total">
+           Items total &middot; USD
+          </span>
+         </dt>
+         <dd>
+          <strong class="total">
+           $240.00
+          </strong>
+         </dd>
+        </div>
+       </dl>
+      </div>
+      <section>
+       <h3>
+        Delivery notes
+       </h3>
+       <p class="small muted mt-8">
+        Please confirm availability within the supplier&rsquo;s Monday-to-Friday delivery window. Oct 18 is an unconfirmed Sunday lead-time estimate, not a requested regular delivery. Oat milk has at least a 2-day coverage gap; the actual gap may be longer. No tax or shipping estimate is included in this draft.
+       </p>
+      </section>
+      <hr class="mini-divider"/>
+      <div class="row between wrap small">
+       <span>
+        Example approval: Jamie Lee &middot; Oct 13, 09:10
+       </span>
+       <span class="muted">
+        Stock snapshot: Oct 13, 08:42
+       </span>
+      </div>
+      <p class="small muted mt-16">
+       STATIC TEMPLATE &middot; NOT A VALID ORDER &middot; Fictional supplier, products, addresses, and approval. No supplier has been contacted.
+      </p>
+     </article>
+     <p class="data-note">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-info">
+       </use>
+      </svg>
+      <span>
+       No taxes, shipping, currency conversion, or rounding rules are calculated. Export must verify the approved snapshot in your application.
+      </span>
+     </p>
+    </div>
+    <footer class="page-footer">
+     <span>
+      StockLoop / Cornerstore HTML template &middot; 2026
+     </span>
+     <span>
+      Static screen &middot; No data is saved
+     </span>
+     <a href="components.html">
+      Component library
+     </a>
+     <a href="states.html">
+      Screen states
+     </a>
+    </footer>
+   </main>
+  </div>
+  <!-- STATIC TEMPLATE: replace fixture links and example data with your application bindings. No runtime JavaScript. -->
+ </body>
+</html>

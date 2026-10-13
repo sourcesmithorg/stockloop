@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+  <meta content="StockLoop static HTML UI template. Demo data only; no business logic." name="description"/>
+  <title>
+   Inventory &middot; StockLoop template
+  </title>
+  <link href="assets/loop.svg" rel="icon" type="image/svg+xml"/>
+  <link href="assets/styles.css" rel="stylesheet"/>
+ </head>
+ <body>
+  <a class="skip-link" href="#main-content">
+   Skip to content
+  </a>
+  <svg aria-hidden="true" class="sr-only" height="0" width="0" xmlns="http://www.w3.org/2000/svg">
+   <symbol id="i-grid" viewbox="0 0 24 24">
+    <rect height="7" rx="1.5" width="7" x="3" y="3">
+    </rect>
+    <rect height="7" rx="1.5" width="7" x="14" y="3">
+    </rect>
+    <rect height="7" rx="1.5" width="7" x="3" y="14">
+    </rect>
+    <rect height="7" rx="1.5" width="7" x="14" y="14">
+    </rect>
+   </symbol>
+   <symbol id="i-box" viewbox="0 0 24 24">
+    <path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7 5.8l9 5">
+    </path>
+   </symbol>
+   <symbol id="i-spark" viewbox="0 0 24 24">
+    <path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5zM20 3v4M18 5h4">
+    </path>
+   </symbol>
+   <symbol id="i-file" viewbox="0 0 24 24">
+    <path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6">
+    </path>
+   </symbol>
+   <symbol id="i-truck" viewbox="0 0 24 24">
+    <path d="M3 5h11v12H3zM14 9h4l3 4v4h-7">
+    </path>
+    <circle cx="7" cy="18" r="2">
+    </circle>
+    <circle cx="18" cy="18" r="2">
+    </circle>
+   </symbol>
+   <symbol id="i-upload" viewbox="0 0 24 24">
+    <path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6">
+    </path>
+   </symbol>
+   <symbol id="i-settings" viewbox="0 0 24 24">
+    <path d="m10 3-1 3-3 1-3 3 1 3-1 3 3 3 3 1 1 3h4l1-3 3-1 3-3-1-3 1-3-3-3-3-1-1-3z">
+    </path>
+    <circle cx="12" cy="13" r="3">
+    </circle>
+   </symbol>
+   <symbol id="i-chevron" viewbox="0 0 24 24">
+    <path d="m8 10 4 4 4-4">
+    </path>
+   </symbol>
+   <symbol id="i-right" viewbox="0 0 24 24">
+    <path d="M4 12h16m-6-6 6 6-6 6">
+    </path>
+   </symbol>
+   <symbol id="i-left" viewbox="0 0 24 24">
+    <path d="M20 12H4m6-6-6 6 6 6">
+    </path>
+   </symbol>
+   <symbol id="i-search" viewbox="0 0 24 24">
+    <circle cx="10.5" cy="10.5" r="6.5">
+    </circle>
+    <path d="m16 16 5 5">
+    </path>
+   </symbol>
+   <symbol id="i-bell" viewbox="0 0 24 24">
+    <path d="M18 8a6 6 0 0 0-12 0c0 8-3 8-3 10h18c0-2-3-2-3-10M10 21h4">
+    </path>
+   </symbol>
+   <symbol id="i-plus" viewbox="0 0 24 24">
+    <path d="M12 5v14M5 12h14">
+    </path>
+   </symbol>
+   <symbol id="i-check" viewbox="0 0 24 24">
+    <path d="m5 12 4 4L19 6">
+    </path>
+   </symbol>
+   <symbol id="i-check-circle" viewbox="0 0 24 24">
+    <circle cx="12" cy="12" r="9">
+    </circle>
+    <path d="m8 12 3 3 5-6">
+    </path>
+   </symbol>
+   <symbol id="i-info" viewbox="0 0 24 24">
+    <circle cx="12" cy="12" r="9">
+    </circle>
+    <path d="M12 10v7M12 6h.01">
+    </path>
+   </symbol>
+   <symbol id="i-warn" viewbox="0 0 24 24">
+    <path d="m12 3 10 18H2zM12 9v5M12 17h.01">
+    </path>
+   </symbol>
+   <symbol id="i-clock" viewbox="0 0 24 24">
+    <circle cx="12" cy="12" r="9">
+    </circle>
+    <path d="M12 7v5l3 2">
+    </path>
+   </symbol>
+   <symbol id="i-globe" viewbox="0 0 24 24">
+    <circle cx="12" cy="12" r="9">
+    </circle>
+    <path d="M3 12h18M12 3c-5 5-5 13 0 18 5-5 5-13 0-18">
+    </path>
+   </symbol>
+   <symbol id="i-filter" viewbox="0 0 24 24">
+    <path d="M4 7h16M7 12h10M10 17h4">
+    </path>
+   </symbol>
+   <symbol id="i-download" viewbox="0 0 24 24">
+    <path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5">
+    </path>
+   </symbol>
+   <symbol id="i-refresh" viewbox="0 0 24 24">
+    <path d="M20 7V3m0 4h-4M4 17v4m0-4h4M20 7a9 9 0 0 0-16 2M4 17a9 9 0 0 0 16-2">
+    </path>
+   </symbol>
+   <symbol id="i-mail" viewbox="0 0 24 24">
+    <rect height="14" rx="2" width="18" x="3" y="5">
+    </rect>
+    <path d="m3 6 9 7 9-7">
+    </path>
+   </symbol>
+   <symbol id="i-store" viewbox="0 0 24 24">
+    <path d="M3 9 5 3h14l2 6M4 10v11h16V10M8 21v-7h5v7">
+    </path>
+    <path d="M3 9c0 4 6 4 6 0 0 4 6 4 6 0 0 4 6 4 6 0M9 3v6M15 3v6">
+    </path>
+   </symbol>
+   <symbol id="i-menu" viewbox="0 0 24 24">
+    <path d="M4 6h16M4 12h16M4 18h16">
+    </path>
+   </symbol>
+   <symbol id="i-help" viewbox="0 0 24 24">
+    <circle cx="12" cy="12" r="9">
+    </circle>
+    <path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 5M12 18h.01">
+    </path>
+   </symbol>
+   <symbol id="i-logout" viewbox="0 0 24 24">
+    <path d="M9 3H3v18h6M8 12h13m-5-5 5 5-5 5">
+    </path>
+   </symbol>
+   <symbol id="i-layers" viewbox="0 0 24 24">
+    <path d="m12 3 10 6-10 6L2 9zM2 14l10 6 10-6">
+    </path>
+   </symbol>
+   <symbol id="i-lock" viewbox="0 0 24 24">
+    <rect height="11" rx="2" width="16" x="4" y="10">
+    </rect>
+    <path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3">
+    </path>
+   </symbol>
+   <symbol id="i-edit" viewbox="0 0 24 24">
+    <path d="m16 3 5 5-12 12-6 1 1-6zM13 6l5 5">
+    </path>
+   </symbol>
+   <symbol id="i-arrow-up" viewbox="0 0 24 24">
+    <path d="M12 19V5m-6 6 6-6 6 6">
+    </path>
+   </symbol>
+   <symbol id="i-external" viewbox="0 0 24 24">
+    <path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7">
+    </path>
+   </symbol>
+   <symbol id="i-close" viewbox="0 0 24 24">
+    <path d="m6 6 12 12M18 6 6 18">
+    </path>
+   </symbol>
+   <symbol id="i-print" viewbox="0 0 24 24">
+    <path d="M6 8V3h12v5M6 17H3V8h18v9h-3M6 13h12v8H6zM17 10h.01">
+    </path>
+   </symbol>
+   <symbol id="i-shield" viewbox="0 0 24 24">
+    <path d="m12 3 8 3v6c0 5-8 9-8 9S4 17 4 12V6zM8 12l3 3 5-6">
+    </path>
+   </symbol>
+   <symbol id="i-wallet" viewbox="0 0 24 24">
+    <path d="M21 7H3V4h15v3M3 7v14h18V7M21 11h-7v6h7M17 14h.01">
+    </path>
+   </symbol>
+   <symbol id="i-chart" viewbox="0 0 24 24">
+    <path d="M4 3v18h17M8 16v-4M13 16V7M18 16v-6">
+    </path>
+   </symbol>
+   <symbol id="i-pause" viewbox="0 0 24 24">
+    <path d="M8 5v14M16 5v14">
+    </path>
+   </symbol>
+   <symbol id="i-trash" viewbox="0 0 24 24">
+    <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7">
+    </path>
+   </symbol>
+  </svg>
+  <!-- COMPONENT: app-sidebar -->
+  <aside aria-label="Main navigation" class="sidebar" data-component="app-sidebar">
+   <a aria-label="StockLoop overview" class="brand" href="index.html">
+    <img alt="" height="33" src="assets/loop.svg" width="33"/>
+    stockloop
+    <span class="sr-only">
+     template
+    </span>
+   </a>
+   <a class="workspace-button" href="settings.html#store">
+    <span class="workspace-initial">
+     M
+    </span>
+    <span>
+     <strong>
+      Maple &amp; Main
+     </strong>
+     <small>
+      Neighborhood market
+     </small>
+    </span>
+    <svg aria-hidden="true" class="icon">
+     <use href="#i-chevron">
+     </use>
+    </svg>
+   </a>
+   <ul class="nav-list">
+    <li>
+     <a class="nav-link" href="index.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-grid">
+       </use>
+      </svg>
+      <span>
+       Overview
+      </span>
+     </a>
+    </li>
+    <li>
+     <a aria-current="page" class="nav-link" href="inventory.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-box">
+       </use>
+      </svg>
+      <span>
+       Inventory
+      </span>
+     </a>
+    </li>
+    <li>
+     <a class="nav-link" href="reorder.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-spark">
+       </use>
+      </svg>
+      <span>
+       Reorder studio
+      </span>
+      <span class="count">
+       4
+      </span>
+     </a>
+    </li>
+    <li>
+     <a class="nav-link" href="orders.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-file">
+       </use>
+      </svg>
+      <span>
+       Purchase orders
+      </span>
+      <span class="count">
+       2
+      </span>
+     </a>
+    </li>
+    <li>
+     <a class="nav-link" href="suppliers.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-truck">
+       </use>
+      </svg>
+      <span>
+       Suppliers
+      </span>
+     </a>
+    </li>
+    <li>
+     <a class="nav-link" href="imports.html">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-upload">
+       </use>
+      </svg>
+      <span>
+       Data imports
+      </span>
+     </a>
+    </li>
+   </ul>
+   <div class="sidebar-bottom">
+    <div class="sidebar-note">
+     <strong>
+      Good stock. Less guesswork.
+     </strong>
+     Your shelf, one step ahead.
+    </div>
+    <a class="nav-link" href="settings.html">
+     <svg aria-hidden="true" class="icon">
+      <use href="#i-settings">
+      </use>
+     </svg>
+     <span>
+      Settings
+     </span>
+    </a>
+    <a class="nav-link" href="states.html">
+     <svg aria-hidden="true" class="icon">
+      <use href="#i-layers">
+      </use>
+     </svg>
+     <span>
+      Template states
+     </span>
+    </a>
+    <a class="sidebar-profile" href="settings.html#account">
+     <span class="avatar">
+      JL
+     </span>
+     <span>
+      <strong>
+       Jamie Lee
+      </strong>
+      <small>
+       Store owner &middot; Demo account
+      </small>
+     </span>
+    </a>
+   </div>
+  </aside>
+  <!-- COMPONENT: mobile-navigation -->
+  <nav aria-label="Mobile navigation" class="mobile-nav-landmark" data-component="mobile-navigation">
+   <details class="mobile-nav">
+    <summary>
+     <span class="brand">
+      <img alt="" height="33" src="assets/loop.svg" width="33"/>
+      stockloop
+     </span>
+     <span class="row small">
+      Menu
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-menu">
+       </use>
+      </svg>
+     </span>
+    </summary>
+    <ul class="nav-list">
+     <li>
+      <a class="nav-link" href="index.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-grid">
+        </use>
+       </svg>
+       <span>
+        Overview
+       </span>
+      </a>
+     </li>
+     <li>
+      <a aria-current="page" class="nav-link" href="inventory.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-box">
+        </use>
+       </svg>
+       <span>
+        Inventory
+       </span>
+      </a>
+     </li>
+     <li>
+      <a class="nav-link" href="reorder.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-spark">
+        </use>
+       </svg>
+       <span>
+        Reorder studio
+       </span>
+       <span class="count">
+        4
+       </span>
+      </a>
+     </li>
+     <li>
+      <a class="nav-link" href="orders.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-file">
+        </use>
+       </svg>
+       <span>
+        Purchase orders
+       </span>
+       <span class="count">
+        2
+       </span>
+      </a>
+     </li>
+     <li>
+      <a class="nav-link" href="suppliers.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-truck">
+        </use>
+       </svg>
+       <span>
+        Suppliers
+       </span>
+      </a>
+     </li>
+     <li>
+      <a class="nav-link" href="imports.html">
+       <svg aria-hidden="true" class="icon">
+        <use href="#i-upload">
+        </use>
+       </svg>
+       <span>
+        Data imports
+       </span>
+      </a>
+     </li>
+    </ul>
+    <a class="nav-link" href="settings.html">
+     <svg aria-hidden="true" class="icon">
+      <use href="#i-settings">
+      </use>
+     </svg>
+     Settings
+    </a>
+    <a class="nav-link" href="states.html">
+     <svg aria-hidden="true" class="icon">
+      <use href="#i-layers">
+      </use>
+     </svg>
+     Template states
+    </a>
+   </details>
+  </nav>
+  <div class="app-main">
+   <!-- COMPONENT: app-header -->
+   <header class="app-header" data-component="app-header">
+    <div class="breadcrumb">
+     <span>
+      Workspace
+     </span>
+     <svg aria-hidden="true" class="icon sm">
+      <use href="#i-right">
+      </use>
+     </svg>
+     <strong>
+      Inventory
+     </strong>
+    </div>
+    <div class="header-tools">
+     <span class="pill outline">
+      Demo data
+     </span>
+     <a class="header-locale" href="settings.html#region">
+      EN / USD
+     </a>
+     <a aria-label="View sample notifications" class="icon-btn" href="states.html#notifications">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-bell">
+       </use>
+      </svg>
+     </a>
+     <a aria-label="Jamie Lee account" href="settings.html#account">
+      <span class="avatar header-avatar">
+       JL
+      </span>
+     </a>
+    </div>
+   </header>
+   <main class="main" id="main-content">
+    <!-- COMPONENT: page-heading -->
+    <div class="page-head" data-component="page-heading">
+     <div>
+      <p class="eyebrow">
+       Inventory
+      </p>
+      <h1>
+       Every shelf has a story.
+      </h1>
+      <p class="description">
+       Know what&rsquo;s moving, what&rsquo;s waiting, and what might run out.
+      </p>
+     </div>
+     <div class="page-head-actions">
+      <a class="btn" href="states.html#product-form">
+       <svg aria-hidden="true" class="icon sm">
+        <use href="#i-plus">
+        </use>
+       </svg>
+       Example product form
+      </a>
+      <a class="btn primary" href="imports.html">
+       <svg aria-hidden="true" class="icon sm">
+        <use href="#i-upload">
+        </use>
+       </svg>
+       Import inventory
+      </a>
+     </div>
+    </div>
+    <nav aria-label="Inventory sections" class="tab-links">
+     <a aria-current="page" class="active" href="inventory.html">
+      All inventory
+      <span class="muted">
+       128
+      </span>
+     </a>
+     <a href="states.html#stock-risk">
+      Attention states
+     </a>
+     <a href="states.html#zero-sales">
+      No recent sales
+     </a>
+     <a href="states.html#missing-data">
+      Data needed
+     </a>
+    </nav>
+    <div class="toolbar">
+     <label class="search-field" for="inventory-search">
+      <svg aria-hidden="true" class="icon">
+       <use href="#i-search">
+       </use>
+      </svg>
+      <span class="sr-only">
+       Search products
+      </span>
+      <input aria-describedby="search-static" id="inventory-search" placeholder="Search product name or SKU" type="search"/>
+     </label>
+     <details class="filter-details">
+      <summary class="btn">
+       <svg aria-hidden="true" class="icon sm">
+        <use href="#i-filter">
+        </use>
+       </svg>
+       Filters
+      </summary>
+      <div class="filter-options">
+       <div class="field">
+        <label for="risk-filter">
+         Stock status
+        </label>
+        <select id="risk-filter" name="risk-filter">
+         <option selected="" value="all">
+          All statuses
+         </option>
+         <option value="risk">
+          At risk
+         </option>
+         <option value="low">
+          Running low
+         </option>
+         <option value="healthy">
+          Healthy
+         </option>
+         <option value="unknown">
+          Data needed
+         </option>
+        </select>
+       </div>
+       <div class="field">
+        <label for="supplier-filter">
+         Supplier
+        </label>
+        <select id="supplier-filter" name="supplier-filter">
+         <option selected="" value="all">
+          All suppliers
+         </option>
+         <option value="fresh">
+          Freshfield Foods
+         </option>
+         <option value="daily">
+          Daily Goods Co.
+         </option>
+        </select>
+       </div>
+       <p class="muted small">
+        Visual filter controls. Filtering is not implemented.
+       </p>
+      </div>
+     </details>
+     <a class="btn" href="states.html#export-success">
+      <svg aria-hidden="true" class="icon sm">
+       <use href="#i-download">
+       </use>
+      </svg>
+      Export state
+     </a>
+    </div>
+    <p class="sr-only" id="search-static">
+     Static template. Search and filters do not update the sample rows.
+    </p>
+    <section class="panel">
+     <p class="scroll-hint mt-16">
+      Scroll horizontally for lead times and actions.
+     </p>
+     <div aria-label="Inventory list: eight illustrative products" class="table-scroll" role="region" tabindex="0">
+      <!-- COMPONENT: data-table -->
+      <table class="data-table inventory-table" data-component="data-table">
+       <caption class="sr-only">
+        Inventory list: eight illustrative products
+       </caption>
+       <thead>
+        <tr>
+         <th scope="col">
+          Product
+         </th>
+         <th class="num" scope="col">
+          On hand
+         </th>
+         <th class="num" scope="col">
+          Daily sales
+         </th>
+         <th scope="col">
+          Lead time
+         </th>
+         <th scope="col">
+          Est. cover
+         </th>
+         <th scope="col">
+          Status
+         </th>
+         <th scope="col">
+          Details
+         </th>
+        </tr>
+       </thead>
+       <tbody>
+        <tr>
+         <td>
+          <div class="product-line">
+           <img alt="" class="product-thumb" height="48" src="assets/product-oat.svg" width="42"/>
+           <div>
+            <a class="product-name" href="product.html">
+             Oat milk &middot; 1 L
+            </a>
+            <span class="sub mono">
+             SKU-001
+            </span>
+           </div>
+          </div>
+         </td>
+         <td class="num">
+          12 units
+         </td>
+         <td class="num">
+          4.0 / day
+         </td>
+         <td>
+          5 days
+         </td>
+         <td>
+          <span class="coverage bad">
+           <i aria-hidden="true" style="--fill:15%">
+            <span>
+            </span>
+           </i>
+           3 days
+          </span>
+         </td>
+         <td>
+          <span class="pill bad">
+           <svg aria-hidden="true" class="icon">
+            <use href="#i-warn">
+            </use>
+           </svg>
+           At risk
+          </span>
+         </td>
+         <td>
+          <a class="btn small-btn" href="product.html">
+           View oat milk
+          </a>
+         </td>
+        </tr>
+        <tr>
+         <td>
+          <div class="product-line">
+           <img alt="" class="product-thumb" height="48" src="assets/product-rice.svg" width="42"/>
+           <div>
+            <span class="product-name">
+             Jasmine rice &middot; 1 kg
+            </span>
+            <span class="sub mono">
+             SKU-002
+            </span>
+           </div>
+          </div>
+         </td>
+         <td class="num">
+          18 units
+         </td>
+         <td class="num">
+          3.0 / day
+         </td>
+         <td>
+          3 days
+         </td>
+         <td>
+          <span class="coverage warn">
+           <i aria-hidden="true" style="--fill:30%">
+            <span>
+            </span>
+           </i>
+           6 days
+          </span>
+         </td>
+         <td>
+          <span class="pill warn">
+           Running low
+          </span>
+         </td>
+         <td>
+          <a class="btn small-btn" href="states.html#pack-moq">
+           View state example
+          </a>
+         </td>
+        </tr>
+        <tr>
+         <td>
+          <div class="product-line">
+           <img alt="" class="product-thumb" height="48" src="assets/product-noodles.svg" width="42"/>
+           <div>
+            <span class="product-name">
+             Instant noodles &middot; 85 g
+            </span>
+            <span class="sub mono">
+             SKU-003
+            </span>
+           </div>
+          </div>
+         </td>
+         <td class="num">
+          32 units
+         </td>
+         <td class="num">
+          8.0 / day
+         </td>
+         <td>
+          5 days
+         </td>
+         <td>
+          <span class="coverage bad">
+           <i aria-hidden="true" style="--fill:20%">
+            <span>
+            </span>
+           </i>
+           4 days
+          </span>
+         </td>
+         <td>
+          <span class="pill bad">
+           <svg aria-hidden="true" class="icon">
+            <use href="#i-warn">
+            </use>
+           </svg>
+           At risk
+          </span>
+         </td>
+         <td>
+          <a class="btn small-btn" href="states.html#delivery-gap">
+           View state example
+          </a>
+         </td>
+        </tr>
+        <tr>
+         <td>
+          <div class="product-line">
+           <img alt="" class="product-thumb" height="48" src="assets/product-water.svg" width="42"/>
+           <div>
+            <span class="product-name">
+             Sparkling water &middot; 500 ml
+            </span>
+            <span class="sub mono">
+             SKU-004
+            </span>
+           </div>
+          </div>
+         </td>
+         <td class="num">
+          24 units
+         </td>
+         <td class="num">
+          6.0 / day
+         </td>
+         <td>
+          2 days
+         </td>
+         <td>
+          <span class="coverage warn">
+           <i aria-hidden="true" style="--fill:20%">
+            <span>
+            </span>
+           </i>
+           4 days
+          </span>
+         </td>
+         <td>
+          <span class="pill warn">
+           Running low
+          </span>
+         </td>
+         <td>
+          <a class="btn small-btn" href="states.html#pack-moq">
+           View state example
+          </a>
+         </td>
+        </tr>
+        <tr>
+         <td>
+          <div class="product-line">
+           <img alt="" class="product-thumb" height="48" src="assets/product-coffee.svg" width="42"/>
+           <div>
+            <span class="product-name">
+             House blend coffee &middot; 250 g
+            </span>
+            <span class="sub mono">
+             SKU-005
+            </span>
+           </div>
+          </div>
+         </td>
+         <td class="num">
+          48 units
+         </td>
+         <td class="num">
+          2.0 / day
+         </td>
+         <td>
+          4 days
+         </td>
+         <td>
+          <span class="coverage">
+           <i aria-hidden="true" style="--fill:85%">
+            <span>
+            </span>
+           </i>
+           24 days
+          </span>
+         </td>
+         <td>
+          <span class="pill good">
+           Healthy
+          </span>
+         </td>
+         <td>
+          <a class="btn small-btn" href="states.html#product-form">
+           View state example
+          </a>
+         </td>
+        </tr>
+        <tr>
+         <td>
+          <div class="product-line">
+           <img alt="" class="product-thumb" height="48" src="assets/product-tea.svg" width="42"/>
+           <div>
+            <span class="product-name">
+             Chamomile tea &middot; 20 bags
+            </span>
+            <span class="sub mono">
+             SKU-006
+            </span>
+           </div>
+          </div>
+         </td>
+         <td class="num">
+          22 units
+         </td>
+         <td class="num">
+          0 / day
+         </td>
+         <td>
+          4 days
+         </td>
+         <td>
+          <span class="muted">
+           Not estimated
+          </span>
+         </td>
+         <td>
+          <span class="pill outline">
+           No recent sales
+          </span>
+         </td>
+         <td>
+          <a class="btn small-btn" href="states.html#zero-sales">
+           View state example
+          </a>
+         </td>
+        </tr>
+        <tr>
+         <td>
+          <div class="product-line">
+           <img alt="" class="product-thumb" height="48" src="assets/product-soap.svg" width="42"/>
+           <div>
+            <span class="product-name">
+             Hand soap &middot; 250 ml
+            </span>
+            <span class="sub mono">
+             SKU-007
+            </span>
+           </div>
+          </div>
+         </td>
+         <td class="num">
+          0 units
+         </td>
+         <td class="num">
+          1.2 / day
+         </td>
+         <td>
+          4 days
+         </td>
+         <td>
+          <span class="coverage bad">
+           <i aria-hidden="true" style="--fill:0%">
+            <span>
+            </span>
+           </i>
+           0 days
+          </span>
+         </td>
+         <td>
+          <span class="pill bad">
+           <svg aria-hidden="true" class="icon">
+            <use href="#i-warn">
+            </use>
+           </svg>
+           Out of stock
+          </span>
+         </td>
+         <td>
+          <a class="btn small-btn" href="states.html#out-of-stock">
+           View state example
+          </a>
+         </td>
+        </tr>
+        <tr>
+         <td>
+          <div class="product-line">
+           <img alt="" class="product-thumb" height="48" src="assets/product-flour.svg" width="42"/>
+           <div>
+            <span class="product-name">
+             All-purpose flour &middot; 1 kg
+            </span>
+            <span class="sub mono">
+             SKU-008
+            </span>
+           </div>
+          </div>
+         </td>
+         <td class="num">
+          Unknown
+         </td>
+         <td class="num">
+          No history
+         </td>
+         <td>
+          Unknown
+         </td>
+         <td>
+          <span class="muted">
+           Unavailable
+          </span>
+         </td>
+         <td>
+          <span class="pill info">
+           <svg aria-hidden="true" class="icon">
+            <use href="#i-info">
+            </use>
+           </svg>
+           Data needed
+          </span>
+         </td>
+         <td>
+          <a class="btn small-btn" href="states.html#missing-supplier">
+           View state example
+          </a>
+         </td>
+        </tr>
+       </tbody>
+      </table>
+     </div>
+     <div class="panel-foot">
+      <span>
+       Showing 8 illustrative rows &middot; 128 sample products
+      </span>
+      <span class="row">
+       <button class="btn small-btn" disabled="" type="button">
+        Previous
+       </button>
+       <span class="pill">
+        Page 1
+       </span>
+       <a class="btn small-btn" href="states.html#empty-search">
+        Next page state
+       </a>
+      </span>
+     </div>
+    </section>
+    <p class="data-note">
+     <svg aria-hidden="true" class="icon">
+      <use href="#i-info">
+      </use>
+     </svg>
+     <span>
+      Lead time and sales history are separate inputs. Unknown values never mean zero. All dates use the store timezone.
+     </span>
+    </p>
+    <footer class="page-footer">
+     <span>
+      StockLoop / Cornerstore HTML template &middot; 2026
+     </span>
+     <span>
+      Static screen &middot; No data is saved
+     </span>
+     <a href="components.html">
+      Component library
+     </a>
+     <a href="states.html">
+      Screen states
+     </a>
+    </footer>
+   </main>
+  </div>
+  <!-- STATIC TEMPLATE: replace fixture links and example data with your application bindings. No runtime JavaScript. -->
+ </body>
+</html>

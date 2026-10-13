@@ -1,0 +1,74 @@
+# codeql.yml — GitHub CodeQL static security analysis (free for public repos).
+#
+# Languages: javascript-typescript (web/) and python (api/), one matrix leg
+# each. Triggers: pushes to main, every pull request, weekly schedule.
+#
+# Empty-tree guard: CodeQL initializes for a language regardless, but a
+# database with zero source files can fail at the analyze step (or upload a
+# vacuous result). Before init we count tracked source files for the matrix
+# language with `git ls-files`; when the count is zero the init/analyze
+# steps are skipped with a ::notice:: annotation. The workflow therefore
+# neither errors nor reports misleading results on the current scaffold-less
+# tree, and activates automatically once web/ or api/ contain source files.
+#
+# No autobuild step: both languages are interpreted — there is nothing to
+# compile, and autobuild would be another way to fail on an empty tree.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "37 5 * * 1" # weekly, Monday 05:37 UTC
+
+permissions:
+  contents: read
+  security-events: write # upload SARIF results
+  packages: read # read private packages if analysis ever needs them
+  actions: read # read other workflow runs for better diagnostics
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check for tracked ${{ matrix.language }} source files
+        id: src
+        run: |
+          case "${{ matrix.language }}" in
+            javascript-typescript)
+              patterns=('*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.cjs')
+              ;;
+            python)
+              patterns=('*.py')
+              ;;
+          esac
+          count=$(git ls-files -- "${patterns[@]}" | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=CodeQL skipped (${{ matrix.language }})::no tracked source files for this language yet — analysis activates when the scaffold lands"
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "Found $count tracked ${{ matrix.language }} source files"
+          fi
+
+      - name: Initialize CodeQL
+        if: steps.src.outputs.present == 'true'
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Analyze
+        if: steps.src.outputs.present == 'true'
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:${{ matrix.language }}

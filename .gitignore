@@ -1,0 +1,33 @@
+# Node
+node_modules/
+.pnpm-store/
+web/dist/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# GCP provisioning transcripts — contain raw `gcloud auth list` output
+# (third-party account emails). Never commit these.
+docs/gcp-provision.log
+docs/*.provision.log
+*-provision.log
+
+# Editors / OS
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.log

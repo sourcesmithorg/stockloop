@@ -1,0 +1,41 @@
+StockLoop task queue
+====================
+
+Sources: .docs/roadmap.md (milestones), .docs/BACKLOG.md (task granularity),
+.docs/DECISIONS.md (what still blocks what). This file is the live order;
+those files are the reference.
+
+Before any implementation task:
+  - the D-xx decisions it depends on must be recorded in docs/decisions/
+  - its write paths must be named
+  - its acceptance test IDs must be named
+
+[ ] 1. Scaffold web/ — React 18 + TypeScript + Vite, Tailwind configured from the
+       /README.md token table, shadcn/ui initialized, app shell ported from
+       .template/index.html + assets/styles.css. Acceptance: T-02, T-03, T-04.
+       Blocked by: nothing. Write paths: web/ only.
+
+[ ] 2. Scaffold api/ — FastAPI app, uv-managed, async SQLAlchemy + Alembic
+       pointing at compose Postgres, /api/health. Acceptance: health returns 200
+       with db reachable. Write paths: api/ only.
+
+[ ] 3. Coherent fixture dataset + Postgres schema for Product, Supplier, StockSnapshot,
+       SalesRecord (see .docs/DATA-CONTRACTS.md). Acceptance: the oat-milk arithmetic
+       in .docs/ACCEPTANCE-TESTS.md T-11/T-13 reproduces exactly.
+       Decision needed: D-05, D-06, D-07.
+
+[ ] 4. Deterministic risk view + restock proposal (no AI). Acceptance: T-11, T-12, T-13.
+       Decision needed: D-09, D-10.
+
+[ ] 5. Inventory + overview screens against real API data. Acceptance: T-01, T-02, T-03.
+
+[ ] 6. Advisory Gemini explanation behind a server adapter, with rule-based fallback.
+       Acceptance: T-16, T-17. Decision needed: D-13.
+
+[ ] 7. Human approval + immutable version + supplier document export.
+       Acceptance: T-18, T-19, T-21. Decision needed: D-04, D-11.
+
+[ ] 8. Cloud Run deployment (frontend + backend). Decision needed: D-15.
+
+Each future task is checked off only with evidence, per .docs/BACKLOG.md
+("Task completion requires owner authorization and actual evidence").

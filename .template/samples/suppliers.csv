@@ -1,0 +1,3 @@
+supplier_id,name,currency,contact_email,lead_time_days
+SUP-001,Freshfield Foods,USD,supply@example.test,5
+SUP-002,Daily Goods Co.,USD,orders@example.test,3

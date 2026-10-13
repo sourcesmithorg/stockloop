@@ -1,0 +1,5 @@
+row,field,value,severity,message
+18,stock_on_hand,-4,blocking,Stock must be zero or greater
+52,sku,SKU-052,blocking,Duplicate SKU and snapshot key
+79,snapshot_date,13/32/2026,blocking,Date must match YYYY-MM-DD
+104,supplier_id,SUP-009,warning,Referenced supplier is missing

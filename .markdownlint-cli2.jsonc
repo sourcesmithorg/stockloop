@@ -1,0 +1,17 @@
+{
+  // Markdown lint config used by .github/workflows/quality.yml (auto-discovered
+  // by markdownlint-cli2). Run bare: `npx markdownlint-cli2`.
+  //
+  // .docs/ and .template/ are delivered read-only reference material: they are
+  // excluded from linting here and are guarded by a separate CI job that fails
+  // if a PR edits them at all. All other tracked *.md files are linted.
+  //
+  // The lint step is non-blocking on day one (existing prose predates the
+  // gate); rule tuning happens here, not by deleting findings.
+  "globs": [
+    "**/*.md",
+    "!.docs/**",
+    "!.template/**"
+  ],
+  "config": {}
+}

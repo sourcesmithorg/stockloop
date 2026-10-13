@@ -1,0 +1,44 @@
+name: Feature request
+description: Propose a change to StockLoop
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem being solved
+      description: The retailer or contributor pain this addresses.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else was tried or ruled out, and why.
+    validations:
+      required: false
+  - type: dropdown
+    id: invariant
+    attributes:
+      label: Which product invariant does this touch?
+      description: Pick the closest match; "None" means it does not touch these boundaries.
+      options:
+        - None
+        - Human approval — a person approves every purchase proposal
+        - Deterministic-vs-advisory AI — rules authoritative, AI advisory only
+        - Unknown-vs-zero data — unknown stock/cost/history is not zero
+        - Currency policy — no cross-currency summing without approved conversion
+    validations:
+      required: true
+  - type: checkboxes
+    id: no-autonomy
+    attributes:
+      label: Scope check
+      options:
+        - label: This request does not propose autonomous purchasing — a human still approves every order.
+          required: true

@@ -1,0 +1,5 @@
+sku,supplier_id,unit_cost,lead_time_days,pack_size,minimum_order_units
+SKU-001,SUP-001,2.50,5,12,24
+SKU-002,SUP-001,4.00,3,6,30
+SKU-003,SUP-002,0.75,5,24,48
+SKU-004,SUP-002,1.50,2,12,24

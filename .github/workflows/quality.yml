@@ -1,0 +1,85 @@
+# quality.yml — repository hygiene gates that are meaningful today.
+#
+# Kept out of ci.yml deliberately: ci.yml guards app scaffolds and must stay
+# green-by-construction until web/ and api/ exist, while these jobs exercise
+# the repo itself and run at full strength from day one.
+#
+#   * actionlint  — validates every file under .github/workflows/ (runs
+#                   today; tool versions are pinned and checksum-verified).
+#   * markdownlint — lints tracked *.md with .markdownlint-cli2.jsonc,
+#                   which excludes the read-only .docs/ and .template/
+#                   trees. Non-blocking on day one (existing prose predates
+#                   the gate; findings surface as warnings) — delete the
+#                   continue-on-error below after the first docs cleanup
+#                   pass to make it blocking.
+#   * protected-dirs — fails any PR that edits .docs/ or .template/: those
+#                   are verbatim delivered reference material, so an edit
+#                   is a real defect, not a style choice. PR-only, diffed
+#                   against the PR base commit.
+
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install actionlint v1.7.12 (SHA-256 verified)
+        run: |
+          version=1.7.12
+          tarball="actionlint_${version}_linux_amd64.tar.gz"
+          curl -fsSL -o "${tarball}" "https://github.com/rhysd/actionlint/releases/download/v${version}/${tarball}"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  ${tarball}" | sha256sum -c -
+          tar xzf "${tarball}"
+
+      - name: Lint workflow files
+        run: ./actionlint -no-color
+
+  markdownlint:
+    name: markdownlint (non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Lint markdown
+        id: mdlint
+        continue-on-error: true # non-blocking on day one; see header
+        run: npx --yes markdownlint-cli2@0.23.3
+
+      - name: Surface findings as a warning
+        if: steps.mdlint.outcome == 'failure'
+        run: echo "::warning title=Markdown lint::markdownlint-cli2 reported issues (currently non-blocking). See the 'Lint markdown' step log; remove continue-on-error in quality.yml to enforce."
+
+  protected-dirs:
+    name: Guard .docs/ and .template/
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history, so the PR base commit is available
+
+      - name: Fail if the PR edits delivered reference material
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          changed=$(git diff --name-only "${BASE_SHA}" HEAD -- .docs .template)
+          if [ -n "${changed}" ]; then
+            echo "::error title=Protected directory modified::.docs/ and .template/ are verbatim delivered reference material; editing them is a defect. Offending files:"
+            printf '%s\n' "${changed}"
+            exit 1
+          fi
+          echo "OK: .docs/ and .template/ untouched."

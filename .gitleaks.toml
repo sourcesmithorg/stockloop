@@ -1,0 +1,45 @@
+# StockLoop gitleaks configuration.
+#
+# Extends the gitleaks default ruleset and allowlists ONLY the documented
+# placeholder credentials that ship in this repo's configuration templates.
+# The job in .github/workflows/gitleaks.yml scans the FULL git history with
+# this config and must exit non-zero on any real secret.
+#
+# Do not broaden these allowlists. Every entry below is deliberately narrow
+# (anchored to the placeholder value itself, not to a file path) so that a
+# real credential placed anywhere — including in .env.example — still reports.
+
+title = "StockLoop gitleaks config"
+
+  # Note: the AWS documentation example key `AKIAIOSFODNN7EXAMPLE` is not
+  # flagged by any gitleaks version — the upstream aws-access-token rule
+  # carries its own allowlist regex `.+EXAMPLE$` (real AWS keys never end
+  # in EXAMPLE). CI detection is therefore verified with a
+  # realistic-format fake key instead.
+
+[extend]
+  # Inherit the complete default ruleset (AWS keys, GitHub/Slack/Google
+  # tokens, private keys, generic high-entropy tokens, etc.). Rules are
+  # never removed; green CI must come from "no secrets", not from silence.
+  useDefault = true
+
+[[allowlists]]
+  description = """
+  POSTGRES_PASSWORD assignments whose value is the literal placeholder
+  `change-me-locally` from .env.example (the documented configuration
+  surface) and compose.yaml (local-dev default). This value is published
+  on purpose and is not a secret. Only this exact assignment form with
+  this exact placeholder is skipped: any other password value on the same
+  key still reports.
+  """
+  regexes = ['''(?i)POSTGRES_PASSWORD\s*[=:][^\n]*change-me-locally''']
+
+[[allowlists]]
+  description = """
+  Database URLs whose embedded password is the same documented placeholder
+  (`...:change-me-locally@localhost:5433/...`, e.g. the DATABASE_URL line
+  in .env.example, quoted in README/docs, or echoed by Makefile output).
+  Only URLs carrying that exact placeholder password are skipped; a URL
+  with any other embedded credential still reports.
+  """
+  regexes = ['''(?i)(?:postgres|postgresql)\+?\w*://[^\s/:@]+:change-me-locally@''']

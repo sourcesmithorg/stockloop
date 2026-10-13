@@ -1,0 +1,248 @@
+# ci.yml — StockLoop continuous integration (frontend + backend).
+#
+# Triggers: every pull request, and pushes to main.
+# Concurrency: superseded runs on the same ref are cancelled.
+# Permissions: top-level `contents: read` only; no job elevates.
+#
+# Scaffold guards — the repo has no app code yet:
+#   * Job `changes` probes web/package.json and api/pyproject.toml, emits
+#     ::notice:: annotations explaining what it skipped, and publishes
+#     outputs.
+#   * Jobs `web` and `api` re-probe locally (their own notice next to the
+#     job that would have done the work) and gate every substantive step
+#     behind that probe. Today they go green in seconds with a notice;
+#     the moment the scaffolds land they run for real.
+#
+# Scaffold contract expected when these jobs switch on:
+#   web/: package.json, pnpm-lock.yaml, `"packageManager": "pnpm@…"` in
+#         package.json (pnpm version is read from there), tsconfig.json,
+#         eslint config, a prettier devDependency, and a `test` script.
+#   api/: pyproject.toml + uv.lock, dev dependency group containing
+#         ruff, mypy, pytest (uv installs the dev group by default).
+#   API tests get Postgres on localhost:5433 via a service container —
+#   same host port as compose.yaml — and a matching DATABASE_URL.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect scaffolds
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.probe.outputs.web }}
+      api: ${{ steps.probe.outputs.api }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Probe web/ and api/
+        id: probe
+        run: |
+          web=false
+          api=false
+          if [ -f web/package.json ]; then
+            web=true
+          else
+            echo "::notice title=web scaffold absent::web/package.json not found — frontend checks (tsc, eslint, prettier, tests) are skipped until the Vite scaffold lands"
+          fi
+          if [ -f api/pyproject.toml ]; then
+            api=true
+          else
+            echo "::notice title=api scaffold absent::api/pyproject.toml not found — backend checks (ruff, mypy, pytest) are skipped until the FastAPI scaffold lands"
+          fi
+          echo "web=$web" >> "$GITHUB_OUTPUT"
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+
+  web:
+    name: Web (pnpm)
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scaffold probe
+        id: probe
+        run: |
+          if [ -f web/package.json ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=web job skipped::web/package.json absent — nothing to install, typecheck or lint yet"
+          fi
+
+      - name: Checkout
+        if: steps.probe.outputs.ok == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm
+        if: steps.probe.outputs.ok == 'true'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        # No `version` input on purpose: the version is read from the
+        # `packageManager` field in web/package.json (pinning both would
+        # make the action fail on any mismatch).
+
+      - name: Set up Node.js + pnpm store cache
+        if: steps.probe.outputs.ok == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies (frozen lockfile)
+        if: steps.probe.outputs.ok == 'true'
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Detect available checks
+        id: tools
+        if: steps.probe.outputs.ok == 'true'
+        working-directory: web
+        run: |
+          tsc=false
+          eslint=false
+          prettier=false
+          test=false
+          if [ -f tsconfig.json ]; then
+            tsc=true
+          else
+            echo "::notice title=tsc skipped::web/tsconfig.json absent"
+          fi
+          if [ -f eslint.config.js ] || [ -f eslint.config.mjs ] || [ -f eslint.config.cjs ] || [ -f .eslintrc ] || [ -f .eslintrc.js ] || [ -f .eslintrc.json ]; then
+            eslint=true
+          else
+            echo "::notice title=eslint skipped::no eslint config found under web/"
+          fi
+          if [ "$(node -p "const p=require('./package.json');!!(p.devDependencies?.prettier||p.dependencies?.prettier)")" = "true" ]; then
+            prettier=true
+          else
+            echo "::notice title=prettier skipped::prettier not a dependency of web/package.json"
+          fi
+          if [ "$(node -p "const s=require('./package.json').scripts||{};!!s.test")" = "true" ]; then
+            test=true
+          else
+            echo "::notice title=tests skipped::no test script in web/package.json"
+          fi
+          {
+            echo "tsc=$tsc"
+            echo "eslint=$eslint"
+            echo "prettier=$prettier"
+            echo "test=$test"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Typecheck (tsc --noEmit)
+        if: steps.tools.outputs.tsc == 'true'
+        working-directory: web
+        run: pnpm exec tsc --noEmit
+
+      - name: Lint (eslint)
+        if: steps.tools.outputs.eslint == 'true'
+        working-directory: web
+        run: pnpm exec eslint .
+
+      - name: Format check (prettier --check)
+        if: steps.tools.outputs.prettier == 'true'
+        working-directory: web
+        run: pnpm exec prettier --check .
+
+      - name: Tests (pnpm test)
+        if: steps.tools.outputs.test == 'true'
+        working-directory: web
+        run: pnpm test
+
+  api:
+    name: API (uv)
+    needs: changes
+    runs-on: ubuntu-latest
+    services:
+      # Same image and host port as compose.yaml (localhost:5433).
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: stockloop
+          POSTGRES_PASSWORD: change-me-locally
+          POSTGRES_DB: stockloop
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U stockloop"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Scaffold probe
+        id: probe
+        run: |
+          if [ -f api/pyproject.toml ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=api job skipped::api/pyproject.toml absent — nothing to sync, lint or test yet (the Postgres service container still starts and is torn down unused)"
+          fi
+
+      - name: Checkout
+        if: steps.probe.outputs.ok == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        if: steps.probe.outputs.ok == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv (pinned)
+        if: steps.probe.outputs.ok == 'true'
+        run: python -m pip install --quiet uv==0.13.0
+
+      - name: Cache uv downloads
+        if: steps.probe.outputs.ok == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('api/uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+
+      - name: Sync dependencies
+        if: steps.probe.outputs.ok == 'true'
+        working-directory: api
+        run: |
+          if [ -f uv.lock ]; then
+            uv sync --frozen
+          else
+            uv sync
+          fi
+
+      - name: Lint (ruff check)
+        if: steps.probe.outputs.ok == 'true'
+        working-directory: api
+        run: uv run ruff check .
+
+      - name: Format check (ruff format --check)
+        if: steps.probe.outputs.ok == 'true'
+        working-directory: api
+        run: uv run ruff format --check .
+
+      - name: Type check (mypy)
+        if: steps.probe.outputs.ok == 'true'
+        working-directory: api
+        run: uv run mypy .
+
+      - name: Tests (pytest)
+        if: steps.probe.outputs.ok == 'true'
+        working-directory: api
+        env:
+          # Documented placeholder credentials, same values as .env.example;
+          # points at the service container above (host port 5433).
+          DATABASE_URL: postgresql+asyncpg://stockloop:change-me-locally@localhost:5433/stockloop
+        run: uv run pytest -q
