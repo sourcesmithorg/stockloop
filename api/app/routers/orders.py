@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import api_error, get_session, get_store
+from app.domain.calculations import quantize_money
 from app.models import Approval, PurchaseOrder, Store, Supplier
 from app.schemas import OrderDetailOut, OrderLineSnapshot, OrderSummary
 
@@ -44,7 +45,7 @@ async def _order_summaries(
             if order.supplier_id in suppliers
             else "unknown",
             currency=order.currency,
-            itemSubtotal=order.item_subtotal,
+            itemSubtotal=quantize_money(order.item_subtotal, order.currency),
             taxTreatment=order.tax_treatment,
             shippingTreatment=order.shipping_treatment,
             documentStatus=order.document_status,

@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import api_error, get_policy, get_session, get_store, get_today
+from app.domain.calculations import quantize_money, quantize_quantity
 from app.models import Product, ProductSupplierTerms, PurchasingPolicy, SalesRecord, Store, Supplier
 from app.schemas import (
     InventoryRiskView,
@@ -32,10 +33,12 @@ def _terms_out(item: ProductInputs) -> TermsOut | None:
     return TermsOut(
         id=terms.id,
         supplierId=terms.supplier_id,
-        unitCost=terms.unit_cost,
+        unitCost=quantize_money(terms.unit_cost, supplier.document_currency),
         currency=supplier.document_currency,
         purchasePackUnits=terms.purchase_pack_units,
-        minimumOrderUnits=terms.minimum_order_units,
+        minimumOrderUnits=quantize_quantity(
+            terms.minimum_order_units, item.product.quantity_precision
+        ),
         leadTimeValue=terms.lead_time_value,
         leadTimeUnit=terms.lead_time_unit,
         version=terms.version,
@@ -142,7 +145,11 @@ async def get_product(
             .order_by(SalesRecord.business_date)
         )
     ).all()
+    precision = item.product.quantity_precision
     return ProductDetailOut(
         **_product_out(item, view).model_dump(),
-        salesSeries=[SalesPointOut(date=row[0], quantity=row[1]) for row in series_rows],
+        salesSeries=[
+            SalesPointOut(date=row[0], quantity=quantize_quantity(row[1], precision))
+            for row in series_rows
+        ],
     )

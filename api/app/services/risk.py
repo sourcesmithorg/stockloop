@@ -14,6 +14,7 @@ from app.domain.calculations import (
     derive_risk_state,
     estimated_depletion_date,
     is_stale,
+    quantize_quantity,
     ratio,
 )
 from app.models import PurchasingPolicy, Store
@@ -89,7 +90,7 @@ def build_risk_view(
     # ---- sales (measured | zeroVerified | missing)
     if demand.kind == "measured" and demand.value is not None:
         sales_state = SalesMeasured(
-            total=demand.value,
+            total=quantize_quantity(demand.value, product.quantity_precision),
             coveredDays=demand.observed_days,
             windowStart=demand.window_start,
             windowEnd=demand.window_end,

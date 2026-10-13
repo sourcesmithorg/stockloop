@@ -192,7 +192,7 @@ def _generate_with_timeout(provider: GeminiProvider, prompt: str, timeout_s: flo
 
     threading.Thread(target=run, name="gemini-generate", daemon=True).start()
     try:
-        kind, value = results.get(timeout=timeout_s + 1)
+        kind, value = results.get(timeout=timeout_s + 0.5)
     except queue.Empty as exc:
         raise ProviderTimeout(
             f"timeout: provider did not respond within {int(timeout_s)}s"

@@ -22,6 +22,9 @@ from app.domain.calculations import (
     budget_remaining,
     budget_utilization_percent,
     delivery_estimate,
+    quantize_money,
+    quantize_quantity,
+    ratio_str,
     require_finite_nonnegative,
     suggest_order,
     totals_by_currency,
@@ -465,7 +468,7 @@ async def plan_detail(
         budgets.append(
             BudgetStatus(
                 currency=currency,
-                budgetAmount=budget,
+                budgetAmount=(quantize_money(budget, currency) if budget is not None else None),
                 selectedTotal=total,
                 remaining=remaining,
                 utilizationPercent=utilization,
@@ -576,7 +579,7 @@ def order_summary(
         supplierId=order.supplier_id,
         supplierName=supplier_name,
         currency=order.currency,
-        itemSubtotal=order.item_subtotal,
+        itemSubtotal=quantize_money(order.item_subtotal, order.currency),
         taxTreatment=order.tax_treatment,
         shippingTreatment=order.shipping_treatment,
         documentStatus=order.document_status,

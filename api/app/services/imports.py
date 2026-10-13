@@ -479,6 +479,7 @@ async def _persist(
     session: AsyncSession, store: Store, job: ImportJob, issues: list[ImportIssue]
 ) -> ImportPreviewOut:
     session.add(job)
+    await session.flush()  # job row first: import_issue.import_id is a foreign key
     for issue in issues:
         issue.import_id = job.id
         session.add(issue)

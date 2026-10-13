@@ -47,10 +47,10 @@ def test_preview_valid_sales_csv(client: TestClient) -> None:
 def test_preview_counts_issue_severity_and_rows(client: TestClient) -> None:
     content = (
         "sku,sale_date,quantity_sold\n"
-        "SKU-001,2026-10-20,4\n"  # valid
+        "SKU-001,2026-10-25,4\n"  # valid
         "SKU-001,2026-10-21,abc\n"  # blocking: invalid quantity
         "SKU-999,2026-10-22,5\n"  # blocking: unknown sku
-        "SKU-001,2026-10-20,7\n"  # warning: duplicate key in file
+        "SKU-001,2026-10-25,7\n"  # warning: duplicate key in file
     )
     status, body = _upload(client, content)
     assert status == 200
@@ -103,7 +103,7 @@ def test_preview_missing_mapped_column_blocks(client: TestClient) -> None:
 
 def test_commit_skips_existing_rows_without_duplicating(client: TestClient) -> None:
     # 2026-10-05 already exists for SKU-001 (fixture data): warning, skipped at commit.
-    content = "sku,sale_date,quantity_sold\nSKU-001,2026-10-05,4\nSKU-001,2026-10-20,9\n"
+    content = "sku,sale_date,quantity_sold\nSKU-001,2026-10-05,4\nSKU-001,2026-10-26,9\n"
     status, body = _upload(client, content)
     assert status == 200
     assert body["status"] == "validated"

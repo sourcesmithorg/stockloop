@@ -1,4 +1,4 @@
-# deploy.yml — deploy the StockLoop API image to Google Cloud Run.
+# deploy.yml — deploy the StockLoop API and web images to Google Cloud Run.
 #
 # Authentication is keyless Workload Identity Federation (OIDC): the
 # google-github-actions/auth action exchanges the job's short-lived OIDC
@@ -9,15 +9,17 @@
 #   GCP_PROJECT_ID, GCP_REGION
 #
 # No-op guard: the `check` job looks at (a) whether a deployable app exists
-# (api/Dockerfile) and (b) whether all four secrets are configured. If
-# either is missing it emits ::notice:: annotations naming what is absent
-# (secret NAMES only — values are never echoed) and the `deploy` job is
-# skipped. Today both are missing, so every run no-ops green.
+# (api/Dockerfile and/or web/Dockerfile) and (b) whether all four secrets
+# are configured. It emits per-app ready flags plus ::notice:: annotations
+# naming what is absent (secret NAMES only — values are never echoed).
+# Today both Dockerfiles and all four secrets are missing, so every run
+# no-ops green.
 #
-# Pipeline once provisioned: build ./api with Docker, push to an Artifact
-# Registry repository (created if missing), `gcloud run deploy`. The
-# frontend is static and is not deployed from here; add its step when the
-# web scaffold defines a hosting path.
+# Pipeline once provisioned: build ./api and/or ./web with Docker, push to
+# the Artifact Registry repository `stockloop` (created if missing), then
+# `gcloud run deploy` per app — stockloop-api (private) and stockloop-web
+# (public, static frontend). --max-instances 2 is a cost guardrail; the
+# service names and repo name are the ones in docs/deploy-free-tier.md.
 
 name: Deploy
 
@@ -38,7 +40,8 @@ jobs:
     name: Check deploy preconditions
     runs-on: ubuntu-latest
     outputs:
-      ready: ${{ steps.check.outputs.ready }}
+      api_ready: ${{ steps.check.outputs.api_ready }}
+      web_ready: ${{ steps.check.outputs.web_ready }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,12 +54,19 @@ jobs:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           GCP_REGION: ${{ secrets.GCP_REGION }}
         run: |
-          ready=true
+          api_ready=true
+          web_ready=true
           if [ -f api/Dockerfile ]; then
             echo "Deployable app found: api/Dockerfile"
           else
-            ready=false
+            api_ready=false
             echo "::notice title=Deploy skipped::no deployable app yet (api/Dockerfile absent) — Cloud Run deploy activates when the backend scaffold and its Dockerfile land"
+          fi
+          if [ -f web/Dockerfile ]; then
+            echo "Deployable app found: web/Dockerfile"
+          else
+            web_ready=false
+            echo "::notice title=Deploy skipped::no deployable app yet (web/Dockerfile absent) — web deploy activates when the frontend Dockerfile (nginx serving dist/) lands"
           fi
           missing=""
           for var in GCP_WORKLOAD_IDENTITY_PROVIDER GCP_SERVICE_ACCOUNT GCP_PROJECT_ID GCP_REGION; do
@@ -65,16 +75,18 @@ jobs:
             fi
           done
           if [ -n "${missing}" ]; then
-            ready=false
+            api_ready=false
+            web_ready=false
             # Secret NAMES only; values are never printed.
             echo "::notice title=Deploy skipped::GCP is not provisioned yet — missing GitHub secrets:${missing}"
           fi
-          echo "ready=${ready}" >> "$GITHUB_OUTPUT"
+          echo "api_ready=${api_ready}" >> "$GITHUB_OUTPUT"
+          echo "web_ready=${web_ready}" >> "$GITHUB_OUTPUT"
 
   deploy:
     name: Build and deploy to Cloud Run
     needs: check
-    if: needs.check.outputs.ready == 'true'
+    if: needs.check.outputs.api_ready == 'true' || needs.check.outputs.web_ready == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -94,8 +106,9 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Build image and push to Artifact Registry
-        id: build
+      - name: Build API image and push to Artifact Registry
+        id: build-api
+        if: needs.check.outputs.api_ready == 'true'
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           GCP_REGION: ${{ secrets.GCP_REGION }}
@@ -113,14 +126,50 @@ jobs:
           docker push "${image}"
           echo "image=${image}" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy to Cloud Run
+      - name: Deploy API to Cloud Run
+        if: needs.check.outputs.api_ready == 'true'
         env:
           GCP_REGION: ${{ secrets.GCP_REGION }}
-          IMAGE: ${{ steps.build.outputs.image }}
+          IMAGE: ${{ steps.build-api.outputs.image }}
         run: |
           gcloud run deploy stockloop-api \
             --image "${IMAGE}" \
             --region "${GCP_REGION}" \
             --platform managed \
             --port 8080 \
+            --max-instances 2 \
             --no-allow-unauthenticated # secure default; flip deliberately if a public API is wanted
+
+      - name: Build web image and push to Artifact Registry
+        id: build-web
+        if: needs.check.outputs.web_ready == 'true'
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+        run: |
+          repo=stockloop
+          image="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${repo}/stockloop-web:${GITHUB_SHA}"
+          if ! gcloud artifacts repositories describe "${repo}" --location "${GCP_REGION}" > /dev/null 2>&1; then
+            gcloud artifacts repositories create "${repo}" \
+              --repository-format docker \
+              --location "${GCP_REGION}" \
+              --description "StockLoop container images"
+          fi
+          gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+          docker build --tag "${image}" ./web
+          docker push "${image}"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy web to Cloud Run
+        if: needs.check.outputs.web_ready == 'true'
+        env:
+          GCP_REGION: ${{ secrets.GCP_REGION }}
+          IMAGE: ${{ steps.build-web.outputs.image }}
+        run: |
+          gcloud run deploy stockloop-web \
+            --image "${IMAGE}" \
+            --region "${GCP_REGION}" \
+            --platform managed \
+            --port 8080 \
+            --max-instances 2 \
+            --allow-unauthenticated # static frontend is public by design
