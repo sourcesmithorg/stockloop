@@ -7,7 +7,9 @@ earlier states are not provided; fix forward onto `main`.
 
 ## Reporting a Vulnerability
 
-**Open a public GitHub issue** on this repository.
+**Open a public GitHub issue** on this repository — use the *Security report*
+form, not a plain blank issue, so the report arrives with the required fields
+filled in.
 
 Issues are visible to everyone — including an attacker — the moment they
 are filed, so keep the report safe and useful:

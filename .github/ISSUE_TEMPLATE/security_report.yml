@@ -1,0 +1,54 @@
+name: Security report
+description: Report a security vulnerability in StockLoop (public and visible immediately)
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## This issue is public
+
+        It becomes visible to everyone — including a potential attacker — the moment it is filed.
+
+        Therefore this report must NOT contain:
+
+        - Live credentials, tokens, API keys, or passwords
+        - Personal data of any kind
+        - A working exploit against a live system
+
+        Use fictional values. A minimal reproduction is enough.
+  - type: input
+    id: affected-component
+    attributes:
+      label: Affected component
+      description: "e.g. an `api/` endpoint, `web/` UI, or deployment config."
+      placeholder: "e.g. api/src/routes/inventory.py"
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What an attacker gains, or what breaks for users.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction steps
+      description: Numbered steps, using fictional values only.
+    validations:
+      required: true
+  - type: textarea
+    id: remediation
+    attributes:
+      label: Suggested remediation
+      description: Optional — your suggested fix, if you have one.
+    validations:
+      required: false
+  - type: checkboxes
+    id: no-secrets
+    attributes:
+      label: Data check
+      options:
+        - label: I have not included live credentials, secrets, or personal data in this report.
+          required: true
