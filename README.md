@@ -19,6 +19,7 @@ Not implemented yet:
 - Auth (M2): no login, no per-user authorization.
 - Approval/export: plan approval exists; purchase-order export is partial.
 - Deployment config: no Cloud Run wiring; local Compose only.
+- Deployment is manual/opt-in until GCP billing is linked to `stockloop-f1a358a9` and the `run` + `artifactregistry` APIs are enabled. The `Deploy` workflow (`google-github-actions/auth` keyless WIF) already authenticates, but Artifact Registry cannot be enabled with billing disabled, so every deploy fails green-red. Once billing + APIs are ready, set the repository variable `DEPLOY_ENABLED=true` (or run the workflow manually with it set) and push to `main`. Before that, push runs no-op green and emit a `::notice::` explaining the gate.
 
 ## Agreed stack
 

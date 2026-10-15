@@ -8,12 +8,21 @@
 #   GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT,
 #   GCP_PROJECT_ID, GCP_REGION
 #
-# No-op guard: the `check` job looks at (a) whether a deployable app exists
-# (api/Dockerfile and/or web/Dockerfile) and (b) whether all four secrets
-# are configured. It emits per-app ready flags plus ::notice:: annotations
-# naming what is absent (secret NAMES only — values are never echoed).
-# Today both Dockerfiles and all four secrets are missing, so every run
-# no-ops green.
+# Gating order (deploy runs only when ALL three hold):
+#   1. A deployable app exists — api/Dockerfile and/or web/Dockerfile.
+#   2. All four GCP secrets above are configured (NAMES only; values are
+#      never echoed).
+#   3. The repository variable DEPLOY_ENABLED == 'true'.
+#
+# Why the DEPLOY_ENABLED gate exists: keyless WIF auth SUCCEEDS and all four
+# secrets are set, but `gcloud services enable
+# artifactregistry.googleapis.com --project stockloop-f1a358a9` fails with
+# UREQ_PROJECT_BILLING_NOT_FOUND — GCP billing is not linked to the project.
+# `run` and `artifactregistry` cannot be enabled until an owner links trial
+# billing in the Google Cloud Console. Until then every push to main would
+# show a red Deploy check (the build/push step fails on `services enable`),
+# so deploy is opt-in: set DEPLOY_ENABLED=true after billing is linked and the
+# APIs are enabled.
 #
 # Pipeline once provisioned: build ./api and/or ./web with Docker, push to
 # the Artifact Registry repository `stockloop` (created if missing), then
@@ -49,11 +58,15 @@ jobs:
       - name: Evaluate preconditions
         id: check
         env:
+          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           GCP_REGION: ${{ secrets.GCP_REGION }}
         run: |
+          if [ "${DEPLOY_ENABLED}" != "true" ]; then
+            echo "::notice title=Deploy skipped::deployment is awaiting billing link + API enablement + the DEPLOY_ENABLED repository variable (set DEPLOY_ENABLED=true to opt in)"
+          fi
           api_ready=true
           web_ready=true
           if [ -f api/Dockerfile ]; then
@@ -86,7 +99,7 @@ jobs:
   deploy:
     name: Build and deploy to Cloud Run
     needs: check
-    if: needs.check.outputs.api_ready == 'true' || needs.check.outputs.web_ready == 'true'
+    if: (needs.check.outputs.api_ready == 'true' || needs.check.outputs.web_ready == 'true') && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
