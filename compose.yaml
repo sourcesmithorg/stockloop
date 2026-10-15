@@ -15,5 +15,56 @@ services:
       timeout: 5s
       retries: 10
 
+  # One-shot migrate + seed. Both steps are idempotent (alembic upgrade head is
+  # a no-op at head; app.seed only creates missing fixture rows), so this runs
+  # safely on every `docker compose up`. Re-run manually with `make seed`.
+  migrate:
+    build: ./api
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
+    environment: &api-environment
+      # Inside the compose network Postgres is host `db` on port 5432.
+      # Credentials interpolate from the host .env (defaults mirror .env.example).
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-stockloop}:${POSTGRES_PASSWORD:-change-me-locally}@db:5432/${POSTGRES_DB:-stockloop}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+      STOCKLOOP_TODAY: ${STOCKLOOP_TODAY:-}
+      # AI vars pass through from the host .env; empty = rule-based fallback,
+      # no credential is ever baked into an image or this file.
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-}
+      GOOGLE_CLOUD_REGION: ${GOOGLE_CLOUD_REGION:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: ./api
+    environment: *api-environment
+    ports:
+      # Host 8000 (repo convention, Vite dev proxy target) -> container 8080.
+      - "8000:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  web:
+    build: ./web
+    ports:
+      - "5173:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:

@@ -4,21 +4,21 @@ StockLoop is an inventory purchasing copilot for neighbourhood retailers. It tur
 
 ## Status
 
-Repository structure and documentation are in place; **no application code exists yet**. The UI reference is static HTML with no runtime JavaScript.
+The application is implemented and runs locally: React SPA (`web/`), FastAPI + Alembic API (`api/`), Postgres 16 — all wired through `docker compose up`.
 
 Works today:
 
-- `make template` previews the 19 static reference screens.
-- `make db-up` starts a local Postgres.
-- The domain contracts and design system are fully documented.
+- `make up` builds and starts the whole stack: database, migrations, fixture seed, API, web UI.
+- API: FastAPI, async SQLAlchemy, Alembic, 8 routers, idempotent fixture seed (`python -m app.seed`), tests in `api/tests`.
+- Web: React 18 + TypeScript + Vite SPA with the full route tree; outside Docker it defaults to bundled fixtures (`VITE_USE_MOCK=true`), while the containerized build talks to the real API through the nginx `/api` proxy.
+- AI endpoints are advisory Gemini calls with a deterministic rule-based fallback — empty AI variables mean no credentials are required.
+- `make template` previews the 19 static reference screens; `make db-up` starts only Postgres.
 
-Does not exist yet:
+Not implemented yet:
 
-- No `web/` scaffold.
-- No `api/` scaffold.
-- No database schema.
-- No AI integration.
-- No deployment config.
+- Auth (M2): no login, no per-user authorization.
+- Approval/export: plan approval exists; purchase-order export is partial.
+- Deployment config: no Cloud Run wiring; local Compose only.
 
 ## Agreed stack
 
@@ -40,15 +40,15 @@ stockloop/
 ├── .docs/              # delivered implementation guidance (read-only)
 ├── .template/          # delivered static HTML reference (read-only)
 ├── docs/               # project-owned docs; decisions/ holds decision records
-├── api/                # FastAPI backend            (empty, README stub)
-├── web/                # React + Vite frontend      (empty, README stub)
+├── api/                # FastAPI backend (uv, Alembic, Dockerfile)
+├── web/                # React + Vite frontend (pnpm, nginx Dockerfile)
 ├── .env.example        # documented configuration surface
 ├── .gitattributes      # LF normalization; binary markers
 ├── .gitignore
 ├── AGENTS.md           # canonical agent entry point
 ├── README.md           # human onboarding
-├── Makefile            # template / db-up / db-down / db-logs / env
-├── compose.yaml        # Postgres 16 on host :5433
+├── Makefile            # up / down / logs / seed / shell-api / template / db-* / env
+├── compose.yaml        # Postgres :5433, API host :8000->:8080, web :5173, one-shot migrate+seed
 └── todo                # live ordered task queue
 ```
 
@@ -64,15 +64,31 @@ Local Postgres deliberately runs on host port **5433**, not 5432, so it cannot c
 ## Getting started
 
 ```bash
-git clone git@me.github.com:sourcesmithorg/stockloop.git
+git clone git@github.com:sourcesmithorg/stockloop.git
 cd stockloop
 cp .env.example .env
 
 make template   # preview the static UI reference at http://localhost:4173
-make db-up      # start local Postgres 16 on localhost:5433
+make up         # build + start Postgres, migrate + seed, API, web
 ```
 
-The frontend and backend are not scaffolded yet — see "Status". This is deliberate: the first implementation tasks in the task queue scaffold them.
+Ports after `make up`:
+
+| URL | Service |
+|---|---|
+| http://localhost:5173 | Web UI (nginx; `/api` proxied to the API) |
+| http://localhost:8000/api/health | API health — `db.reachable: true` when Postgres is up (host 8000 → container 8080) |
+| localhost:5433 | Postgres on the host (5432 inside the compose network) |
+
+Notes:
+
+- Migrations and the fixture seed run automatically on every start via the one-shot `migrate` service (`alembic upgrade head && python -m app.seed` — both idempotent). Re-run any time with `make seed`.
+- Reset the database: `docker compose down -v` (drops the `pgdata` volume), then `make up` — the next start ends seeded and usable again.
+- Logs: `make logs` (all services) or `make db-logs`; shell inside the API container: `make shell-api`.
+- AI defaults to rule-based with no credentials: `.env.example` ships `GEMINI_API_KEY` empty, and no secret is baked into any image or `compose.yaml`. Fill the AI variables only if you want the advisory Gemini endpoints.
+- The database-only workflow is unchanged: `make db-up` / `make db-down` / `make db-logs`. The API host port (8000 → container 8080) and web host port (5173 → container 8080) are fixed in `compose.yaml`.
+
+See "Status" above for what is and is not implemented yet.
 
 ## Design tokens
 
