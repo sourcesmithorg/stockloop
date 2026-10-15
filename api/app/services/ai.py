@@ -155,10 +155,14 @@ class GeminiProvider:
     @staticmethod
     def _http_options(types: Any, timeout_s: float) -> Any:
         try:
-            return types.HttpOptions(timeout=timeout_s)
+            # google-genai measures HttpOptions.timeout in MILLISECONDS; passing
+            # seconds shrank the budget to ~10ms, so every IPv4 connect timed out
+            # and only the unroutable-IPv6 fallback error surfaced:
+            # "[Errno 101] Network is unreachable" (egress itself is fine).
+            return types.HttpOptions(timeout=int(timeout_s * 1000))
         except TypeError:
-            # Older SDKs use different units/kwargs; the daemon-thread timeout
-            # below is the authoritative bound either way.
+            # Older SDKs use different kwargs; the daemon-thread timeout below
+            # is the authoritative bound either way.
             return None
 
 
