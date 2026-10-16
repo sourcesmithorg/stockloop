@@ -1,48 +1,29 @@
 import type {
   Approval,
-  DeliveryEstimate,
-  ExportAttempt,
-  ImportIssue,
-  ImportPreview,
-  InventoryRiskItem,
-  Maybe,
-  OrderLine,
-  Plan,
-  PlanBudget,
-  PlanLine,
+  InventoryRiskView,
+  OrderDetail,
+  OrderSummary,
+  PlanDetail,
+  PlanSummary,
   Product,
-  ProductDetail,
-  PurchaseOrder,
-  PurchaseOrderDetail,
-  RiskState,
-  SalesValue,
-  StockValue,
+  SalesPoint,
   Supplier,
-  SupplierDetail,
-  SupplierGroup,
-  SupplierTerms,
 } from '@/lib/api';
-import { usd } from '@/lib/money';
-
-import {
-  coverDays,
-  lineTotalMinor,
-  rawRequired,
-  suggestUnits,
-  utilizationPercent,
-} from './calculations';
 
 /**
- * Acceptance fixture — reproduces the verified arithmetic from
- * .docs/CALCULATION-RULES.md and T-11..T-14 exactly:
+ * Demo fixtures — the same shape as api/app/schemas.py responses, pinned to
+ * the acceptance-fixture date (2026-10-13) so tests are deterministic:
  *
- *   Oat milk      48 units (4 × 12) @ 2.50 = 120.00
- *   Jasmine rice  30 units (5 × 6)  @ 4.00 = 120.00
- *   Noodles       96 units (4 × 24) @ 0.75 =  72.00
- *   Sparkling H2O 48 units (4 × 12) @ 1.50 =  72.00
- *   Total        222 units                    384.00
+ *   Oat milk      48 units (4 × 12) @ 2.50 = 120.00   at risk (3d cover, 5d lead)
+ *   Jasmine rice  30 units (5 × 6)  @ 4.00 = 120.00   running low (MOQ applied)
+ *   Noodles       96 units (4 × 24) @ 0.75 =  72.00   at risk (1-day delivery gap)
+ *   Sparkling H2O 48 units (4 × 12) @ 1.50 =  72.00   running low
+ *   Total        222 units                            384.00 USD
  *   Freshfield 240.00 + Daily Goods 144.00; budget 500.00; remaining 116.00;
  *   utilization 76.8%; tax/shipping EXCLUDED (not zero).
+ *
+ * Chamomile tea adds a verified-zero-sales state; all-purpose flour adds the
+ * unknown-is-not-zero state (no stock, sales, terms or supplier on record).
  */
 
 export const DEMO_DATE = { iso: '2026-10-13', label: 'Tuesday, October 13' } as const;
@@ -57,644 +38,726 @@ export const STORE = {
   demo: true,
 } as const;
 
-// ---- Oat-milk fixture inputs (T-11: 12 stock, 4/day, 3 days cover, 5d lead) ----
+export const POLICY_VERSION = '2026-10-13.v1';
+const WINDOW = { start: '2026-09-30', end: '2026-10-12' } as const;
+const STOCK_AS_OF = '2026-10-13';
+const SNAPSHOT_ID = 'SNAP-2026-10-13';
 
-export const OAT_MILK = {
-  stock: 12,
-  demandPerDay: 4,
-  targetDays: 7,
-  leadDays: 5,
-  safetyDays: 2,
-  packUnits: 12,
-  minOrderUnits: 24,
-  unitCostMinor: 250,
-} as const;
-
-export const OAT_MILK_RAW_REQUIRED = rawRequired(
-  OAT_MILK.demandPerDay,
-  OAT_MILK.stock,
-  OAT_MILK.targetDays,
-  OAT_MILK.leadDays,
-  OAT_MILK.safetyDays,
-); // 4 × (7 + 5 + 2) − 12 = 44
-
-export const OAT_MILK_SUGGESTED_UNITS = suggestUnits(
-  OAT_MILK_RAW_REQUIRED,
-  OAT_MILK.packUnits,
-  OAT_MILK.minOrderUnits,
-); // 12 × ceil(44 / 12) = 48
-
-export const OAT_MILK_SALES_WINDOW = { start: '2026-09-30', end: '2026-10-12' } as const;
-
-/** 13 daily values, Sep 30 – Oct 12; total 52, average 4. */
-export const OAT_MILK_SALES_13D = [3, 4, 2, 5, 4, 6, 4, 3, 5, 4, 3, 5, 4] as const;
-
-export const OAT_MILK_DAILY_SALES = OAT_MILK_SALES_13D.map((units, index) => {
-  const date = new Date(Date.UTC(2026, 8, 30)); // window start: Sep 30, 2026
-  date.setUTCDate(date.getUTCDate() + index);
-  return { date: date.toISOString().slice(0, 10), units };
-});
-export const PACK_MOQ_CASE = { rawDemand: 17, packUnits: 12, minOrderUnits: 24 } as const;
-
-export const FIXTURE_BUDGET_MINOR = 50_000; // USD 500.00
-
-// ---- Catalog ----
-
-export const PRODUCTS: Product[] = [
-  {
-    id: 'PROD-OAT',
-    sku: 'SKU-001',
-    name: 'Oat milk',
-    category: 'Dairy alternatives',
-    baseUnit: 'each',
-  },
-  { id: 'PROD-RICE', sku: 'SKU-002', name: 'Jasmine rice', category: 'Grains', baseUnit: 'each' },
-  {
-    id: 'PROD-NOODLE',
-    sku: 'SKU-003',
-    name: 'Instant noodles',
-    category: 'Snacks',
-    baseUnit: 'each',
-  },
-  {
-    id: 'PROD-WATER',
-    sku: 'SKU-004',
-    name: 'Sparkling water',
-    category: 'Beverages',
-    baseUnit: 'each',
-  },
-  { id: 'PROD-TEA', sku: 'SKU-005', name: 'Decaf tea', category: 'Beverages', baseUnit: 'each' },
-  { id: 'PROD-SOAP', sku: 'SKU-006', name: 'Dish soap', category: 'Household', baseUnit: 'each' },
-  {
-    id: 'PROD-COFFEE',
-    sku: 'SKU-007',
-    name: 'Ground coffee',
-    category: 'Beverages',
-    baseUnit: 'each',
-  },
-];
+// ---- Suppliers (SupplierOut) ----
 
 export const SUPPLIERS: Supplier[] = [
   {
     id: 'SUP-001',
     code: 'SUP-001',
     name: 'Freshfield Foods',
-    contactName: 'Dana Okafor',
-    email: 'orders@freshfield.example',
+    contactEmail: 'supply@example.test',
     documentCurrency: 'USD',
     leadTimeDays: 5,
-    deliveryDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    cutoffTime: '15:00',
-    lastVerifiedAt: '2026-09-28T14:00:00Z',
+    // Mon-Fri regular delivery window (stated in the delivered fixture).
+    deliveryDays: [0, 1, 2, 3, 4],
+    calendarConfirmed: true,
+    lastVerifiedAt: '2026-10-13',
+    version: 1,
   },
   {
     id: 'SUP-002',
     code: 'SUP-002',
     name: 'Daily Goods Co.',
-    contactName: 'Sam Rivera',
-    email: 'sales@dailygoods.example',
+    contactEmail: 'orders@example.test',
     documentCurrency: 'USD',
     leadTimeDays: 3,
-    deliveryDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-    cutoffTime: '17:00',
-    lastVerifiedAt: '2026-10-05T10:30:00Z',
+    // No delivery calendar on record: estimates are calendar bounds only.
+    deliveryDays: null,
+    calendarConfirmed: false,
+    lastVerifiedAt: '2026-10-13',
+    version: 1,
   },
 ];
 
-export const SUPPLIER_TERMS: SupplierTerms[] = [
-  {
-    productId: 'PROD-OAT',
-    supplierId: 'SUP-001',
-    unitCost: usd(250),
-    purchasePackUnits: 12,
-    minimumOrderUnits: 24,
-    leadTimeDays: 5,
-  },
-  {
-    productId: 'PROD-RICE',
-    supplierId: 'SUP-001',
-    unitCost: usd(400),
-    purchasePackUnits: 6,
-    minimumOrderUnits: 6,
-    leadTimeDays: 5,
-  },
-  {
-    productId: 'PROD-NOODLE',
-    supplierId: 'SUP-002',
-    unitCost: usd(75),
-    purchasePackUnits: 24,
-    minimumOrderUnits: 24,
-    leadTimeDays: 3,
-  },
-  {
-    productId: 'PROD-WATER',
-    supplierId: 'SUP-002',
-    unitCost: usd(150),
-    purchasePackUnits: 12,
-    minimumOrderUnits: 12,
-    leadTimeDays: 3,
-  },
-  {
-    productId: 'PROD-TEA',
-    supplierId: 'SUP-002',
-    unitCost: usd(350),
-    purchasePackUnits: 20,
-    minimumOrderUnits: 20,
-    leadTimeDays: 3,
-  },
-  {
-    productId: 'PROD-COFFEE',
-    supplierId: 'SUP-002',
-    unitCost: usd(525),
-    purchasePackUnits: 12,
-    minimumOrderUnits: 12,
-    leadTimeDays: 3,
-  },
-];
+// ---- Risk views (InventoryRiskView) ----
 
-export const SUPPLIER_DETAILS: SupplierDetail[] = SUPPLIERS.map((supplier) => {
-  const terms = SUPPLIER_TERMS.filter((term) => term.supplierId === supplier.id);
+function sources(termsVersion: number | null) {
   return {
-    ...supplier,
-    terms,
-    products: terms.flatMap((term) => {
-      const product = PRODUCTS.find((candidate) => candidate.id === term.productId);
-      return product ? [{ productId: product.id, sku: product.sku, name: product.name }] : [];
-    }),
+    stockSnapshotId: SNAPSHOT_ID,
+    salesThrough: WINDOW.end,
+    termsVersion,
+    policyVersion: POLICY_VERSION,
   };
+}
+
+function delivery(days: number, reason: string): InventoryRiskView['deliveryEstimate'] {
+  const date = new Date(Date.UTC(2026, 9, 13 + days)).toISOString().slice(0, 10);
+  return { kind: 'known', date, confirmed: false, reason };
+}
+
+const UNCONFIRMED = (days: number, calendar: boolean): InventoryRiskView['deliveryEstimate'] =>
+  delivery(
+    days,
+    calendar
+      ? `calendar lower bound: ${days} days from ${STOCK_AS_OF}; falls on a delivery day — unconfirmed estimate, not a supplier slot.`
+      : `calendar lower bound: ${days} days from ${STOCK_AS_OF}; supplier has no delivery calendar on record — unconfirmed estimate, not a supplier slot.`,
+  );
+
+const atUnconfirmedWarning = (sku: string, estimate: InventoryRiskView['deliveryEstimate']) => ({
+  code: 'delivery_estimate_unconfirmed',
+  message:
+    estimate.kind === 'known'
+      ? `${sku}: ${estimate.reason}`
+      : `${sku}: no supplier terms on record`,
 });
 
-/**
- * Delivery estimates are calendar lower bounds, never confirmed slots.
- * Oct 13 + 5 days = Sunday Oct 18; Freshfield delivers Mon–Fri → unconfirmed.
- */
-export const DELIVERY_ESTIMATES: Record<string, DeliveryEstimate> = {
-  'SUP-001': {
-    kind: 'estimated',
-    date: '2026-10-18',
-    confirmed: false,
-    note: 'Sunday — outside Freshfield Foods’ Monday–Friday window. Calendar estimate only, not a confirmed delivery slot.',
-  },
-  'SUP-002': {
-    kind: 'estimated',
-    date: '2026-10-16',
-    confirmed: false,
-    note: 'Calendar estimate only, not a confirmed delivery slot.',
-  },
-};
-
-// ---- Derived risk view (read-only; the API owns these numbers) ----
-
-const FOURTEEN_DAY_WINDOW = { start: '2026-09-29', end: '2026-10-12' } as const;
-const SNAPSHOT_AS_OF = '2026-10-13T09:00:00Z';
-
-function measured(
-  total: number,
-  coveredDays: number,
-  window: { start: string; end: string },
-): SalesValue {
+function measured(total: string): InventoryRiskView['sales'] {
   return {
     kind: 'measured',
-    totalUnits: total,
-    coveredDays,
-    windowStart: window.start,
-    windowEnd: window.end,
+    total,
+    coveredDays: 13,
+    windowStart: WINDOW.start,
+    windowEnd: WINDOW.end,
   };
 }
 
-function knownStock(quantity: number, asOf: string = SNAPSHOT_AS_OF): StockValue {
-  return { kind: 'known', value: quantity, asOf };
+/** 13 daily values, Sep 30 – Oct 12; total 52, average 4. */
+export const OAT_MILK_SALES_13D = [3, 4, 2, 5, 4, 6, 4, 3, 5, 4, 3, 5, 4] as const;
+
+function dailySeries(units: readonly number[]): SalesPoint[] {
+  return units.map((quantity, index) => {
+    const date = new Date(Date.UTC(2026, 8, 30));
+    date.setUTCDate(date.getUTCDate() + index);
+    return { date: date.toISOString().slice(0, 10), quantity: String(quantity) };
+  });
 }
 
-export const INVENTORY_RISK: InventoryRiskItem[] = [
+export const RISK_VIEWS: InventoryRiskView[] = [
   {
-    productId: 'PROD-OAT',
+    productId: 'PROD-001',
     sku: 'SKU-001',
-    name: 'Oat milk',
-    stock: knownStock(12),
-    sales: measured(52, 13, OAT_MILK_SALES_WINDOW),
-    coverDays: coverDays(12, 4),
-    averageDailyDemand: { kind: 'known', value: 4 },
-    leadTimeDays: { kind: 'known', value: 5 },
+    name: 'Oat milk 1 L',
+    category: 'Dairy',
+    baseUnit: 'each',
+    stock: { kind: 'known', value: '12', unit: 'each', asOf: STOCK_AS_OF },
+    sales: measured('52'),
+    averageDailyDemand: { kind: 'known', value: '4' },
+    coverDays: { kind: 'finite', value: '3' },
+    leadTime: {
+      kind: 'known',
+      value: 5,
+      unit: 'calendarDays',
+      termsVersion: 1,
+      calendarConfirmed: true,
+    },
+    estimatedDepletion: { kind: 'known', date: '2026-10-16' },
+    deliveryEstimate: UNCONFIRMED(5, true),
+    deliveryGap: { kind: 'finite', value: '2', unit: 'days' },
     riskState: 'atRisk',
     blockers: [],
-    warnings: [
-      'Delivery timing unconfirmed: Oct 18, 2026 is a Sunday; Freshfield Foods delivers Monday–Friday.',
-      'Delivery gap: 3 days of cover against a 5-day lead time leaves at least 2 days uncovered after ordering.',
-    ],
+    warnings: [atUnconfirmedWarning('SKU-001', UNCONFIRMED(5, true))],
+    sourceVersions: sources(1),
   },
   {
-    productId: 'PROD-RICE',
+    productId: 'PROD-002',
     sku: 'SKU-002',
-    name: 'Jasmine rice',
-    stock: knownStock(24),
-    sales: measured(28, 14, FOURTEEN_DAY_WINDOW),
-    coverDays: coverDays(24, 2),
-    averageDailyDemand: { kind: 'known', value: 2 },
-    leadTimeDays: { kind: 'known', value: 5 },
-    riskState: 'healthy',
-    blockers: [],
-    warnings: [],
-  },
-  {
-    productId: 'PROD-NOODLE',
-    sku: 'SKU-003',
-    name: 'Instant noodles',
-    stock: knownStock(36),
-    sales: measured(72, 12, FOURTEEN_DAY_WINDOW),
-    coverDays: coverDays(36, 6),
-    averageDailyDemand: { kind: 'known', value: 6 },
-    leadTimeDays: { kind: 'known', value: 3 },
+    name: 'Jasmine rice 1 kg',
+    category: 'Pantry',
+    baseUnit: 'each',
+    stock: { kind: 'known', value: '18', unit: 'each', asOf: STOCK_AS_OF },
+    sales: measured('39'),
+    averageDailyDemand: { kind: 'known', value: '3' },
+    coverDays: { kind: 'finite', value: '6' },
+    leadTime: {
+      kind: 'known',
+      value: 3,
+      unit: 'calendarDays',
+      termsVersion: 1,
+      calendarConfirmed: true,
+    },
+    estimatedDepletion: { kind: 'known', date: '2026-10-19' },
+    deliveryEstimate: UNCONFIRMED(3, true),
+    deliveryGap: { kind: 'finite', value: '0', unit: 'days' },
     riskState: 'runningLow',
     blockers: [],
-    warnings: [],
+    warnings: [atUnconfirmedWarning('SKU-002', UNCONFIRMED(3, true))],
+    sourceVersions: sources(1),
   },
   {
-    productId: 'PROD-WATER',
-    sku: 'SKU-004',
-    name: 'Sparkling water',
-    stock: knownStock(96),
-    sales: measured(48, 12, FOURTEEN_DAY_WINDOW),
-    coverDays: coverDays(96, 4),
-    averageDailyDemand: { kind: 'known', value: 4 },
-    leadTimeDays: { kind: 'known', value: 3 },
-    riskState: 'healthy',
+    productId: 'PROD-003',
+    sku: 'SKU-003',
+    name: 'Instant noodles 85 g',
+    category: 'Pantry',
+    baseUnit: 'each',
+    stock: { kind: 'known', value: '32', unit: 'each', asOf: STOCK_AS_OF },
+    sales: measured('104'),
+    averageDailyDemand: { kind: 'known', value: '8' },
+    coverDays: { kind: 'finite', value: '4' },
+    leadTime: {
+      kind: 'known',
+      value: 5,
+      unit: 'calendarDays',
+      termsVersion: 1,
+      calendarConfirmed: false,
+    },
+    estimatedDepletion: { kind: 'known', date: '2026-10-17' },
+    deliveryEstimate: UNCONFIRMED(5, false),
+    deliveryGap: { kind: 'finite', value: '1', unit: 'days' },
+    riskState: 'atRisk',
     blockers: [],
-    warnings: [],
+    warnings: [atUnconfirmedWarning('SKU-003', UNCONFIRMED(5, false))],
+    sourceVersions: sources(1),
   },
   {
-    // Verified zero sales is its own state — not missing data, not healthy.
-    productId: 'PROD-TEA',
+    productId: 'PROD-004',
+    sku: 'SKU-004',
+    name: 'Sparkling water 500 ml',
+    category: 'Beverages',
+    baseUnit: 'each',
+    stock: { kind: 'known', value: '24', unit: 'each', asOf: STOCK_AS_OF },
+    sales: measured('78'),
+    averageDailyDemand: { kind: 'known', value: '6' },
+    coverDays: { kind: 'finite', value: '4' },
+    leadTime: {
+      kind: 'known',
+      value: 2,
+      unit: 'calendarDays',
+      termsVersion: 1,
+      calendarConfirmed: false,
+    },
+    estimatedDepletion: { kind: 'known', date: '2026-10-17' },
+    deliveryEstimate: UNCONFIRMED(2, false),
+    deliveryGap: { kind: 'finite', value: '0', unit: 'days' },
+    riskState: 'runningLow',
+    blockers: [],
+    warnings: [atUnconfirmedWarning('SKU-004', UNCONFIRMED(2, false))],
+    sourceVersions: sources(1),
+  },
+  {
+    productId: 'PROD-005',
     sku: 'SKU-005',
-    name: 'Decaf tea',
-    stock: knownStock(40),
+    name: 'Chamomile tea · 20 bags',
+    category: 'Beverages',
+    baseUnit: 'each',
+    stock: { kind: 'known', value: '22', unit: 'each', asOf: STOCK_AS_OF },
     sales: {
       kind: 'zeroVerified',
-      windowStart: FOURTEEN_DAY_WINDOW.start,
-      windowEnd: FOURTEEN_DAY_WINDOW.end,
+      coveredDays: 13,
+      windowStart: WINDOW.start,
+      windowEnd: WINDOW.end,
     },
-    coverDays: coverDays(40, 0),
-    averageDailyDemand: { kind: 'known', value: 0 },
-    leadTimeDays: { kind: 'known', value: 3 },
+    averageDailyDemand: { kind: 'known', value: '0' },
+    coverDays: {
+      kind: 'noRecentSales',
+      reason: 'verified zero sales in the demand window — cover is not a number',
+    },
+    leadTime: {
+      kind: 'known',
+      value: 3,
+      unit: 'calendarDays',
+      termsVersion: 1,
+      calendarConfirmed: false,
+    },
+    estimatedDepletion: { kind: 'unavailable', reason: 'verified zero sales — no depletion date' },
+    deliveryEstimate: UNCONFIRMED(3, false),
+    deliveryGap: { kind: 'unavailable', reason: 'cover or lead time unavailable' },
     riskState: 'noRecentSales',
     blockers: [],
-    warnings: [],
+    warnings: [
+      atUnconfirmedWarning('SKU-005', UNCONFIRMED(3, false)),
+      { code: 'no_recent_sales', message: 'SKU-005: verified zero sales in window' },
+    ],
+    sourceVersions: sources(1),
   },
   {
-    // Missing inputs are unknown, never zero.
-    productId: 'PROD-SOAP',
+    productId: 'PROD-006',
     sku: 'SKU-006',
-    name: 'Dish soap',
-    stock: { kind: 'unknown', reason: 'No stock count has been imported for this product.' },
-    sales: { kind: 'missing', reason: 'No sales history — import sales data to estimate demand.' },
-    coverDays: { kind: 'unavailable', reason: 'Demand is unknown.' },
-    averageDailyDemand: { kind: 'unknown', reason: 'No sales history on file.' },
-    leadTimeDays: { kind: 'unknown', reason: 'No supplier terms on file.' },
+    name: 'All-purpose flour 1 kg',
+    category: 'Pantry',
+    baseUnit: 'each',
+    stock: { kind: 'unknown', reason: 'no stock snapshot on record' },
+    sales: { kind: 'missing', reason: 'sales history unavailable' },
+    averageDailyDemand: { kind: 'unavailable', reason: 'sales history unavailable' },
+    coverDays: { kind: 'unavailable', reason: 'stock quantity unknown' },
+    leadTime: { kind: 'unavailable', reason: 'no supplier terms on record' },
+    estimatedDepletion: { kind: 'unavailable', reason: 'stock quantity unknown' },
+    deliveryEstimate: {
+      kind: 'unavailable',
+      reason: 'no supplier terms on record',
+      confirmed: false,
+    },
+    deliveryGap: { kind: 'unavailable', reason: 'cover or lead time unavailable' },
     riskState: 'dataNeeded',
     blockers: [
-      'Missing stock count and sales history — import data or count stock to assess this product.',
+      { code: 'stock_unknown', message: 'SKU-006: no stock snapshot on record' },
+      { code: 'sales_history_missing', message: 'SKU-006: sales history unavailable' },
+      { code: 'supplier_terms_missing', message: 'SKU-006: no supplier terms' },
     ],
     warnings: [],
-  },
-  {
-    productId: 'PROD-COFFEE',
-    sku: 'SKU-007',
-    name: 'Ground coffee',
-    stock: knownStock(20, '2026-09-22T09:00:00Z'),
-    sales: measured(60, 12, FOURTEEN_DAY_WINDOW),
-    coverDays: coverDays(20, 5),
-    averageDailyDemand: { kind: 'known', value: 5 },
-    leadTimeDays: { kind: 'known', value: 3 },
-    riskState: 'stale',
-    blockers: [],
-    warnings: ['Stock snapshot is 21 days old (Sep 22, 2026) — counts may be out of date.'],
+    sourceVersions: {
+      stockSnapshotId: null,
+      salesThrough: null,
+      termsVersion: null,
+      policyVersion: POLICY_VERSION,
+    },
   },
 ];
 
-const DEPLETION_DAYS: Record<string, Maybe<number>> = {
-  'PROD-OAT': { kind: 'known', value: 3, asOf: SNAPSHOT_AS_OF },
-  'PROD-RICE': { kind: 'known', value: 12, asOf: SNAPSHOT_AS_OF },
-  'PROD-NOODLE': { kind: 'known', value: 6, asOf: SNAPSHOT_AS_OF },
-  'PROD-WATER': { kind: 'known', value: 24, asOf: SNAPSHOT_AS_OF },
-  'PROD-TEA': { kind: 'unknown', reason: 'No recent sales — depletion not estimated.' },
-  'PROD-SOAP': { kind: 'unknown', reason: 'Stock is unknown — import a stock count first.' },
-  'PROD-COFFEE': { kind: 'known', value: 4, asOf: '2026-09-22T09:00:00Z' },
+// ---- Products (ProductOut with embedded risk) ----
+
+function product(
+  index: number,
+  sku: string,
+  name: string,
+  category: string,
+  supplierId: string | null,
+  terms: Product['terms'],
+): Product {
+  const risk = RISK_VIEWS[index];
+  const supplier = SUPPLIERS.find((candidate) => candidate.id === supplierId) ?? null;
+  return {
+    id: risk.productId,
+    sku,
+    name,
+    category,
+    baseUnit: 'each',
+    quantityPrecision: 0,
+    status: 'active',
+    supplier: supplier ? { id: supplier.id, code: supplier.code, name: supplier.name } : null,
+    terms,
+    risk,
+  };
+}
+
+export const PRODUCTS: Product[] = [
+  product(0, 'SKU-001', 'Oat milk 1 L', 'Dairy', 'SUP-001', {
+    id: 'TERMS-001',
+    supplierId: 'SUP-001',
+    unitCost: '2.50',
+    currency: 'USD',
+    purchasePackUnits: 12,
+    minimumOrderUnits: '24',
+    leadTimeValue: 5,
+    leadTimeUnit: 'calendarDays',
+    version: 1,
+  }),
+  product(1, 'SKU-002', 'Jasmine rice 1 kg', 'Pantry', 'SUP-001', {
+    id: 'TERMS-002',
+    supplierId: 'SUP-001',
+    unitCost: '4.00',
+    currency: 'USD',
+    purchasePackUnits: 6,
+    minimumOrderUnits: '30',
+    leadTimeValue: 3,
+    leadTimeUnit: 'calendarDays',
+    version: 1,
+  }),
+  product(2, 'SKU-003', 'Instant noodles 85 g', 'Pantry', 'SUP-002', {
+    id: 'TERMS-003',
+    supplierId: 'SUP-002',
+    unitCost: '0.75',
+    currency: 'USD',
+    purchasePackUnits: 24,
+    minimumOrderUnits: '48',
+    leadTimeValue: 5,
+    leadTimeUnit: 'calendarDays',
+    version: 1,
+  }),
+  product(3, 'SKU-004', 'Sparkling water 500 ml', 'Beverages', 'SUP-002', {
+    id: 'TERMS-004',
+    supplierId: 'SUP-002',
+    unitCost: '1.50',
+    currency: 'USD',
+    purchasePackUnits: 12,
+    minimumOrderUnits: '24',
+    leadTimeValue: 2,
+    leadTimeUnit: 'calendarDays',
+    version: 1,
+  }),
+  product(4, 'SKU-005', 'Chamomile tea · 20 bags', 'Beverages', 'SUP-002', {
+    id: 'TERMS-005',
+    supplierId: 'SUP-002',
+    unitCost: '3.50',
+    currency: 'USD',
+    purchasePackUnits: 20,
+    minimumOrderUnits: '20',
+    leadTimeValue: 3,
+    leadTimeUnit: 'calendarDays',
+    version: 1,
+  }),
+  // No supplier, no terms, no snapshot, no sales: every input unknown.
+  product(5, 'SKU-006', 'All-purpose flour 1 kg', 'Pantry', null, null),
+];
+
+export const SALES_SERIES: Record<string, SalesPoint[]> = {
+  'PROD-001': dailySeries(OAT_MILK_SALES_13D),
+  'PROD-002': dailySeries([3, 3, 4, 2, 3, 3, 4, 3, 2, 3, 3, 3, 3]),
+  'PROD-003': dailySeries([8, 9, 7, 8, 8, 10, 7, 8, 8, 7, 8, 8, 8]),
+  'PROD-004': dailySeries([6, 7, 5, 6, 6, 7, 5, 6, 7, 5, 6, 6, 6]),
+  'PROD-005': dailySeries([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+  'PROD-006': [],
 };
 
-export const PRODUCT_DETAILS: ProductDetail[] = PRODUCTS.map((product) => {
-  const risk = INVENTORY_RISK.find((candidate) => candidate.productId === product.id);
-  if (!risk) throw new Error(`Fixture product without risk view: ${product.id}`);
-  const terms = SUPPLIER_TERMS.filter((term) => term.productId === product.id);
-  const supplierId = terms[0]?.supplierId;
-  return {
-    ...product,
-    stock: risk.stock,
-    sales: risk.sales,
-    coverDays: risk.coverDays,
-    riskState: risk.riskState as RiskState,
-    supplierTerms: terms,
-    dailySales: product.id === 'PROD-OAT' ? OAT_MILK_DAILY_SALES : [],
-    estimatedDepletionDays: DEPLETION_DAYS[product.id] ?? {
-      kind: 'unknown',
-      reason: 'Not estimated.',
-    },
-    deliveryEstimate: supplierId
-      ? (DELIVERY_ESTIMATES[supplierId] ?? {
-          kind: 'unavailable',
-          confirmed: false,
-          reason: 'No delivery calendar on file.',
-        })
-      : { kind: 'unavailable', confirmed: false, reason: 'No supplier terms on file.' },
-  };
-});
+// ---- Purchase orders (OrderSummary / OrderDetailOut) ----
 
-// ---- Restock plan (acceptance fixture) ----
-
-export const PLAN_ID = 'PLAN-001';
-
-export interface FixtureLineInput {
-  lineId: string;
-  productId: string;
-  supplierId: string;
-  suggestedBaseUnits: number;
-  packUnits: number;
-  unitCostMinor: number;
-  rawRequiredUnits: number | null;
-}
-
-/**
- * Oat milk derives from the approved formula above. Rice/noodles/water are
- * author-written fixture values, not claimed outputs of one global formula
- * (CALCULATION-RULES.md forbids inventing derivations for those rows).
- */
-export const PLAN_LINE_INPUTS: readonly FixtureLineInput[] = [
+export const ORDERS: OrderSummary[] = [
   {
-    lineId: 'PL-001',
-    productId: 'PROD-OAT',
-    supplierId: 'SUP-001',
-    suggestedBaseUnits: OAT_MILK_SUGGESTED_UNITS,
-    packUnits: 12,
-    unitCostMinor: 250,
-    rawRequiredUnits: OAT_MILK_RAW_REQUIRED,
-  },
-  {
-    lineId: 'PL-002',
-    productId: 'PROD-RICE',
-    supplierId: 'SUP-001',
-    suggestedBaseUnits: 30,
-    packUnits: 6,
-    unitCostMinor: 400,
-    rawRequiredUnits: null,
-  },
-  {
-    lineId: 'PL-003',
-    productId: 'PROD-NOODLE',
-    supplierId: 'SUP-002',
-    suggestedBaseUnits: 96,
-    packUnits: 24,
-    unitCostMinor: 75,
-    rawRequiredUnits: null,
-  },
-  {
-    lineId: 'PL-004',
-    productId: 'PROD-WATER',
-    supplierId: 'SUP-002',
-    suggestedBaseUnits: 48,
-    packUnits: 12,
-    unitCostMinor: 150,
-    rawRequiredUnits: null,
-  },
-];
-
-export const PLAN_WARNINGS = [
-  'Tax and shipping are excluded from these totals — they are not zero-cost items.',
-  'Delivery estimates are calendar lower bounds, not confirmed supplier slots.',
-] as const;
-
-export function buildMockPlan(): Plan {
-  const lines: PlanLine[] = PLAN_LINE_INPUTS.map((input) => {
-    const product = PRODUCTS.find((candidate) => candidate.id === input.productId);
-    const supplier = SUPPLIERS.find((candidate) => candidate.id === input.supplierId);
-    if (!product || !supplier) {
-      throw new Error(`Fixture line references an unknown product or supplier: ${input.lineId}`);
-    }
-    const units = input.suggestedBaseUnits;
-    return {
-      id: input.lineId,
-      productId: product.id,
-      sku: product.sku,
-      name: product.name,
-      supplierId: supplier.id,
-      supplierName: supplier.name,
-      selected: true,
-      suggestedBaseUnits: units,
-      editedBaseUnits: null,
-      purchasePackUnits: input.packUnits,
-      purchasePackCount: units / input.packUnits,
-      rawRequiredUnits: input.rawRequiredUnits,
-      excessUnits:
-        input.rawRequiredUnits === null ? null : Math.max(0, units - input.rawRequiredUnits),
-      unitCost: usd(input.unitCostMinor),
-      lineTotal: usd(lineTotalMinor(units, input.unitCostMinor)),
-      deliveryEstimate: DELIVERY_ESTIMATES[supplier.id] ?? {
-        kind: 'unavailable',
-        confirmed: false,
-        reason: 'No delivery calendar on file.',
-      },
-      explanation:
-        product.id === 'PROD-OAT'
-          ? 'Rule-based: 4 units/day × (7 target + 5 lead + 2 safety) = 56 gross; minus 12 on hand = 44 needed; four packs of 12 = 48 units at USD 2.50 each.'
-          : null,
-    };
-  });
-
-  const supplierGroups: SupplierGroup[] = SUPPLIERS.map((supplier) => {
-    const groupLines = lines.filter((line) => line.supplierId === supplier.id);
-    return {
-      supplierId: supplier.id,
-      supplierName: supplier.name,
-      currency: 'USD',
-      subtotal: usd(groupLines.reduce((total, line) => total + line.lineTotal.amountMinor, 0)),
-      lineIds: groupLines.map((line) => line.id),
-    };
-  });
-
-  const totalMinor = lines.reduce((total, line) => total + line.lineTotal.amountMinor, 0);
-  const budgets: PlanBudget[] = [
-    {
-      currency: 'USD',
-      budgetMinor: FIXTURE_BUDGET_MINOR,
-      totalMinor,
-      remainingMinor: FIXTURE_BUDGET_MINOR - totalMinor,
-      utilizationPercent: utilizationPercent(totalMinor, FIXTURE_BUDGET_MINOR),
-      taxIncluded: false,
-      shippingIncluded: false,
-    },
-  ];
-
-  return {
-    id: PLAN_ID,
-    status: 'draft',
-    version: 1,
-    explanationSource: 'rule-based',
-    calculationStatus: 'valid',
-    lines,
-    supplierGroups,
-    budgets,
-    blockers: [],
-    warnings: [...PLAN_WARNINGS],
-    createdAt: '2026-10-13T08:15:00Z',
-  };
-}
-
-// ---- Purchase orders ----
-
-function fixtureOrderLines(supplierId: string): OrderLine[] {
-  return PLAN_LINE_INPUTS.filter((input) => input.supplierId === supplierId).map((input) => {
-    const product = PRODUCTS.find((candidate) => candidate.id === input.productId);
-    if (!product)
-      throw new Error(`Fixture order line references an unknown product: ${input.lineId}`);
-    return {
-      productId: product.id,
-      sku: product.sku,
-      name: product.name,
-      baseUnits: input.suggestedBaseUnits,
-      purchasePackUnits: input.packUnits,
-      purchasePackCount: input.suggestedBaseUnits / input.packUnits,
-      unitCost: usd(input.unitCostMinor),
-      lineTotal: usd(lineTotalMinor(input.suggestedBaseUnits, input.unitCostMinor)),
-    };
-  });
-}
-
-export const ORDERS: PurchaseOrder[] = [
-  {
-    id: 'PO-2026-0041',
-    displayNumber: 'PO-2026-0041',
-    supplierId: 'SUP-001',
-    supplierName: 'Freshfield Foods',
-    currency: 'USD',
-    documentStatus: 'ready',
-    itemSubtotal: usd(24_000),
-    taxTreatment: 'Excluded',
-    shippingTreatment: 'Excluded',
-    createdAt: '2026-10-13T09:05:00Z',
-    approvalId: 'APR-0001',
-    sourcePlanVersion: 1,
-  },
-  {
-    id: 'PO-2026-0042',
-    displayNumber: 'PO-2026-0042',
+    id: 'PO-0143',
+    displayNumber: 'PO-2026-0143',
     supplierId: 'SUP-002',
     supplierName: 'Daily Goods Co.',
     currency: 'USD',
-    documentStatus: 'exported',
-    itemSubtotal: usd(14_400),
-    taxTreatment: 'Excluded',
-    shippingTreatment: 'Excluded',
-    createdAt: '2026-10-12T16:40:00Z',
-    approvalId: 'APR-0000',
-    sourcePlanVersion: 1,
+    itemSubtotal: '144.00',
+    taxTreatment: 'excluded',
+    shippingTreatment: 'excluded',
+    documentStatus: 'approved',
+    approvalId: 'APPROVAL-001',
+    approvalStatus: 'active',
+    planId: 'PLAN-001',
+    productCount: 2,
+    totalUnits: '144',
+    createdAt: '2026-10-13T09:05:00Z',
+  },
+  {
+    id: 'PO-0142',
+    displayNumber: 'PO-2026-0142',
+    supplierId: 'SUP-001',
+    supplierName: 'Freshfield Foods',
+    currency: 'USD',
+    itemSubtotal: '240.00',
+    taxTreatment: 'excluded',
+    shippingTreatment: 'excluded',
+    documentStatus: 'approved',
+    approvalId: 'APPROVAL-001',
+    approvalStatus: 'active',
+    planId: 'PLAN-001',
+    productCount: 2,
+    totalUnits: '78',
+    createdAt: '2026-10-13T09:05:00Z',
+  },
+  {
+    id: 'PO-0138',
+    displayNumber: 'PO-2026-0138',
+    supplierId: 'SUP-001',
+    supplierName: 'Freshfield Foods',
+    currency: 'USD',
+    itemSubtotal: '312.00',
+    taxTreatment: 'excluded',
+    shippingTreatment: 'excluded',
+    documentStatus: 'superseded',
+    approvalId: 'APPROVAL-000',
+    approvalStatus: 'stale',
+    planId: 'PLAN-000',
+    productCount: 3,
+    totalUnits: '96',
+    createdAt: '2026-10-06T11:20:00Z',
   },
 ];
 
-const EXPORTS_BY_ORDER: Record<string, ExportAttempt[]> = {
-  'PO-2026-0041': [
+const ORDER_LINES: Record<string, OrderDetail['lines']> = {
+  'PO-0142': [
     {
-      id: 'EXP-0001',
-      status: 'succeeded',
-      startedAt: '2026-10-13T09:07:00Z',
-      completedAt: '2026-10-13T09:07:03Z',
-      artifactName: 'PO-2026-0041-freshfield-foods.pdf',
-      failureCode: null,
+      productId: 'PROD-001',
+      sku: 'SKU-001',
+      productName: 'Oat milk 1 L',
+      supplierId: 'SUP-001',
+      baseUnits: '48',
+      purchasePackUnits: 12,
+      purchasePackCount: 4,
+      unitCost: '2.50',
+      currency: 'USD',
+      lineTotal: '120.00',
+    },
+    {
+      productId: 'PROD-002',
+      sku: 'SKU-002',
+      productName: 'Jasmine rice 1 kg',
+      supplierId: 'SUP-001',
+      baseUnits: '30',
+      purchasePackUnits: 6,
+      purchasePackCount: 5,
+      unitCost: '4.00',
+      currency: 'USD',
+      lineTotal: '120.00',
     },
   ],
-  'PO-2026-0042': [
+  'PO-0143': [
     {
-      id: 'EXP-0002',
-      status: 'succeeded',
-      startedAt: '2026-10-12T16:45:00Z',
-      completedAt: '2026-10-12T16:45:02Z',
-      artifactName: 'PO-2026-0042-daily-goods-co.pdf',
-      failureCode: null,
+      productId: 'PROD-003',
+      sku: 'SKU-003',
+      productName: 'Instant noodles 85 g',
+      supplierId: 'SUP-002',
+      baseUnits: '96',
+      purchasePackUnits: 24,
+      purchasePackCount: 4,
+      unitCost: '0.75',
+      currency: 'USD',
+      lineTotal: '72.00',
+    },
+    {
+      productId: 'PROD-004',
+      sku: 'SKU-004',
+      productName: 'Sparkling water 500 ml',
+      supplierId: 'SUP-002',
+      baseUnits: '48',
+      purchasePackUnits: 12,
+      purchasePackCount: 4,
+      unitCost: '1.50',
+      currency: 'USD',
+      lineTotal: '72.00',
     },
   ],
 };
 
-export const ORDER_DETAILS: PurchaseOrderDetail[] = ORDERS.map((order) => ({
+export const ORDER_DETAILS: OrderDetail[] = ORDERS.map((order) => ({
   ...order,
-  lines: fixtureOrderLines(order.supplierId),
-  exports: EXPORTS_BY_ORDER[order.id] ?? [],
+  planVersion: order.planId === 'PLAN-001' ? 1 : null,
+  lines: ORDER_LINES[order.id] ?? [],
+  supplierSnapshot: {
+    code: order.supplierId,
+    name: order.supplierName,
+    documentCurrency: order.currency,
+  },
+  disclaimer:
+    'Order document only — nothing has been sent to the supplier; no purchase has been placed or accepted.',
 }));
 
-export const APPROVAL_FIXTURE: Approval = {
-  id: 'APR-0001',
-  planId: PLAN_ID,
+// ---- Restock plans (PlanSummaryOut / PlanDetailOut) ----
+
+const APPROVAL: Approval = {
+  id: 'APPROVAL-001',
+  planId: 'PLAN-001',
   planVersion: 1,
-  lineIds: PLAN_LINE_INPUTS.map((input) => input.lineId),
-  contentDigest: 'fixture-demo-digest',
-  approvedAt: '2026-10-13T09:00:00Z',
-  actorId: 'USER-001',
+  contentDigest: 'b0079f955a9191e5eb949beb2bbca2b03089c14a4fb71ed66cf84eee38c010b9',
+  actorId: 'owner',
+  approvedAt: '2026-10-13T09:10:00Z',
+  status: 'active',
+  acknowledgedWarnings: [],
+  orders: ORDERS.filter((order) => order.planId === 'PLAN-001'),
 };
 
-// ---- Imports ----
-
-export const REQUIRED_IMPORT_COLUMNS = [
-  'sku',
-  'product_name',
-  'stock_quantity',
-  'unit_cost',
-  'supplier_code',
-] as const;
-
-export function fixtureImportIssues(severity: 'all' | 'warning'): ImportIssue[] {
-  const blocking: ImportIssue[] = [
-    {
-      rowNumber: 12,
-      field: 'unit_cost',
-      issueCode: 'invalid_decimal',
-      severity: 'blocking',
-      valuePreview: '2,50',
-      expectedFormat: 'Decimal number with a dot, e.g. 2.50',
-      correctionHint: 'Replace the comma with a dot.',
-    },
-    {
-      rowNumber: 47,
-      field: 'supplier_code',
-      issueCode: 'missing_required',
-      severity: 'blocking',
-      valuePreview: '',
-      expectedFormat: 'A known supplier code, e.g. SUP-001',
-      correctionHint: 'Add the supplier code or remove the row.',
-    },
-  ];
-  const warnings: ImportIssue[] = [
-    {
-      rowNumber: 88,
-      field: 'stock_quantity',
-      issueCode: 'empty_value',
-      severity: 'warning',
-      valuePreview: '',
-      expectedFormat: 'Whole number of base units',
-      correctionHint: 'Blank is treated as missing, not zero. Enter a count or drop the row.',
-    },
-  ];
-  return severity === 'warning' ? warnings : [...blocking, ...warnings];
-}
-
-export function fixtureImportPreview(): ImportPreview {
+function line(
+  index: string,
+  supplierId: string,
+  supplierName: string,
+  ruleTrace: Record<string, unknown>,
+  explanation: string,
+): PlanDetail['lines'][number] {
+  const costs: Record<string, { unit: string; pack: number; count: number; total: string }> = {
+    'PROD-001': { unit: '2.50', pack: 12, count: 4, total: '120.00' },
+    'PROD-002': { unit: '4.00', pack: 6, count: 5, total: '120.00' },
+    'PROD-003': { unit: '0.75', pack: 24, count: 4, total: '72.00' },
+    'PROD-004': { unit: '1.50', pack: 12, count: 4, total: '72.00' },
+  };
+  const product = PRODUCTS.find((candidate) => candidate.id === index);
+  const cost = costs[index];
+  if (!product || !cost) throw new Error(`fixture line: unknown product ${index}`);
+  const suggested = String(cost.pack * cost.count);
   return {
-    id: 'IMP-0001',
-    dataset: 'stock',
-    filename: 'stock-count-oct.csv',
-    status: 'invalid',
-    availableColumns: [...REQUIRED_IMPORT_COLUMNS, 'notes'],
-    requiredColumns: [...REQUIRED_IMPORT_COLUMNS],
-    mapping: {},
-    totalRows: 120,
-    validRows: 118,
-    warningRows: 1,
-    rejectedRows: 2,
-    issues: fixtureImportIssues('all'),
+    id: `LINE-${index.slice(-3)}`,
+    productId: index,
+    sku: product.sku,
+    productName: product.name,
+    supplierId,
+    supplierName,
+    selected: true,
+    originalSuggestedBaseUnits: suggested,
+    editedBaseUnits: null,
+    effectiveBaseUnits: suggested,
+    purchasePackUnits: cost.pack,
+    purchasePackCount: cost.count,
+    unitCost: cost.unit,
+    currency: 'USD',
+    lineTotal: cost.total,
+    termsVersion: 1,
+    ruleTrace,
+    constraintResults: [
+      { code: 'nonnegative_quantity', status: 'pass' },
+      { code: 'pack_multiple', status: 'pass' },
+      { code: 'minimum_order_units', status: 'pass' },
+    ],
+    explanation,
   };
 }
+
+const PLAN_LINES: PlanDetail['lines'] = [
+  line(
+    'PROD-001',
+    'SUP-001',
+    'Freshfield Foods',
+    {
+      demandPerDay: '4',
+      coverDays: '3',
+      targetDays: 7,
+      leadTimeDays: 5,
+      safetyDays: 2,
+      horizonDays: 14,
+      grossTargetUnits: '56',
+      onHandUnits: '12',
+      rawRequiredUnits: '44',
+      minimumOrderUnits: '24',
+      purchasePackUnits: 12,
+      roundedUnits: '48',
+      purchasePackCount: 4,
+      excessUnits: '4',
+      moqApplied: false,
+      formula: 'raw = max(0, d*(T+L+B) - S); units = P * ceil(max(raw, MOQ) / P)',
+    },
+    '48 units (4 packs of 12): target 14 days x 4/day = 56 gross, less 12 on hand = 44 raw; rounded to 48 units for pack/MOQ rules; line total USD 120.00.',
+  ),
+  line(
+    'PROD-002',
+    'SUP-001',
+    'Freshfield Foods',
+    {
+      demandPerDay: '3',
+      coverDays: '6',
+      targetDays: 7,
+      leadTimeDays: 3,
+      safetyDays: 2,
+      horizonDays: 12,
+      grossTargetUnits: '36',
+      onHandUnits: '18',
+      rawRequiredUnits: '18',
+      minimumOrderUnits: '30',
+      purchasePackUnits: 6,
+      roundedUnits: '30',
+      purchasePackCount: 5,
+      excessUnits: '12',
+      moqApplied: true,
+      formula: 'raw = max(0, d*(T+L+B) - S); units = P * ceil(max(raw, MOQ) / P)',
+    },
+    '30 units (5 packs of 6): target 12 days x 3/day = 36 gross, less 18 on hand = 18 raw; rounded to 30 units for pack/MOQ rules; line total USD 120.00; MOQ 30 applied.',
+  ),
+  line(
+    'PROD-003',
+    'SUP-002',
+    'Daily Goods Co.',
+    {
+      demandPerDay: '8',
+      coverDays: '4',
+      targetDays: 7,
+      leadTimeDays: 5,
+      safetyDays: 2,
+      horizonDays: 14,
+      grossTargetUnits: '112',
+      onHandUnits: '32',
+      rawRequiredUnits: '80',
+      minimumOrderUnits: '48',
+      purchasePackUnits: 24,
+      roundedUnits: '96',
+      purchasePackCount: 4,
+      excessUnits: '16',
+      moqApplied: false,
+      formula: 'raw = max(0, d*(T+L+B) - S); units = P * ceil(max(raw, MOQ) / P)',
+    },
+    '96 units (4 packs of 24): target 14 days x 8/day = 112 gross, less 32 on hand = 80 raw; rounded to 96 units for pack/MOQ rules; line total USD 72.00.',
+  ),
+  line(
+    'PROD-004',
+    'SUP-002',
+    'Daily Goods Co.',
+    {
+      demandPerDay: '6',
+      coverDays: '4',
+      targetDays: 7,
+      leadTimeDays: 2,
+      safetyDays: 2,
+      horizonDays: 11,
+      grossTargetUnits: '66',
+      onHandUnits: '24',
+      rawRequiredUnits: '42',
+      minimumOrderUnits: '24',
+      purchasePackUnits: 12,
+      roundedUnits: '48',
+      purchasePackCount: 4,
+      excessUnits: '6',
+      moqApplied: false,
+      formula: 'raw = max(0, d*(T+L+B) - S); units = P * ceil(max(raw, MOQ) / P)',
+    },
+    '48 units (4 packs of 12): target 11 days x 6/day = 66 gross, less 24 on hand = 42 raw; rounded to 48 units for pack/MOQ rules; line total USD 72.00.',
+  ),
+];
+
+const PLAN_WARNINGS: PlanDetail['warnings'] = [
+  {
+    code: 'tax_shipping_excluded',
+    message: 'Tax and shipping are excluded from plan totals — excluded, not zero.',
+  },
+  {
+    code: 'delivery_estimate_unconfirmed',
+    message:
+      'Freshfield Foods: calendar lower bound: 5 days from 2026-10-13 — unconfirmed estimate, not a supplier slot.',
+  },
+  {
+    code: 'delivery_estimate_unconfirmed',
+    message:
+      'Daily Goods Co.: calendar lower bound: 3 days from 2026-10-13; supplier has no delivery calendar on record — unconfirmed estimate, not a supplier slot.',
+  },
+];
+
+function planDetail(id: string, createdAt: string, approved: boolean): PlanDetail {
+  return {
+    id,
+    activeApprovalId: approved ? APPROVAL.id : null,
+    storeId: 'STORE-001',
+    version: 1,
+    calculationStatus: 'valid',
+    reviewStatus: approved ? 'approved' : 'draft',
+    policyVersion: POLICY_VERSION,
+    explanationSource: 'rule-based',
+    sourceVersions: {
+      salesThrough: WINDOW.end,
+      stockAsOf: STOCK_AS_OF,
+      termsVersions: { 'PROD-001': 1, 'PROD-002': 1, 'PROD-003': 1, 'PROD-004': 1 },
+    },
+    totalsByCurrency: { USD: '384.00' },
+    budgets: [
+      {
+        currency: 'USD',
+        budgetAmount: '500.00',
+        selectedTotal: '384.00',
+        remaining: '116.00',
+        utilizationPercent: '76.8',
+        taxTreatment: 'excluded',
+        shippingTreatment: 'excluded',
+      },
+    ],
+    supplierGroups: [
+      {
+        supplierId: 'SUP-001',
+        supplierCode: 'SUP-001',
+        supplierName: 'Freshfield Foods',
+        currency: 'USD',
+        leadTimeDays: 5,
+        lineCount: 2,
+        subtotal: '240.00',
+      },
+      {
+        supplierId: 'SUP-002',
+        supplierCode: 'SUP-002',
+        supplierName: 'Daily Goods Co.',
+        currency: 'USD',
+        leadTimeDays: 3,
+        lineCount: 2,
+        subtotal: '144.00',
+      },
+    ],
+    lines: structuredClone(PLAN_LINES),
+    blockers: [],
+    warnings: structuredClone(PLAN_WARNINGS),
+    activeApproval: approved ? structuredClone(APPROVAL) : null,
+    createdAt,
+    updatedAt: createdAt,
+  };
+}
+
+export const APPROVED_PLAN = planDetail('PLAN-001', '2026-10-13T09:00:00Z', true);
+export const DRAFT_PLAN = planDetail('PLAN-002', '2026-10-13T10:05:00Z', false);
+
+/** Newest first, like the backend list. */
+export const PLAN_SUMMARIES: PlanSummary[] = [DRAFT_PLAN, APPROVED_PLAN].map((plan) => ({
+  id: plan.id,
+  version: plan.version,
+  calculationStatus: plan.calculationStatus,
+  reviewStatus: plan.reviewStatus,
+  totalsByCurrency: plan.totalsByCurrency,
+  activeApprovalId: plan.activeApproval?.id ?? null,
+  createdAt: plan.createdAt,
+  updatedAt: plan.updatedAt,
+}));

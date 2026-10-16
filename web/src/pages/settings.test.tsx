@@ -37,21 +37,25 @@ describe('settings regional save flow (T-05)', () => {
 
     const country = (await screen.findByLabelText('Store country')) as HTMLSelectElement;
     const currency = screen.getByLabelText('Display currency') as HTMLSelectElement;
+    const timezone = screen.getByLabelText('Store timezone') as HTMLSelectElement;
     const status = screen.getByRole('status');
     const save = screen.getByRole('button', { name: /Save changes/ });
 
     expect(status).toHaveTextContent(/No unsaved changes/);
     expect(currency).toHaveValue('USD');
+    expect(timezone).toHaveValue('UTC');
 
     await user.selectOptions(country, 'CA');
     expect(status).toHaveTextContent(/Unsaved changes/);
-    // T-05: changing country does not change the display currency.
+    // T-05: changing country does not change the display currency or the timezone.
     expect(currency).toHaveValue('USD');
+    expect(timezone).toHaveValue('UTC');
 
     await user.click(save);
     await waitFor(() => expect(status).toHaveTextContent(/Changes saved/));
     expect(country).toHaveValue('CA');
     expect(currency).toHaveValue('USD');
+    expect(timezone).toHaveValue('UTC');
   }, 20_000);
 
   it('surfaces a version conflict with the current version and retries after re-fetch', async () => {

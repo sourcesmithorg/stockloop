@@ -7,6 +7,8 @@ export interface DisclosureProps {
   summary: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Start expanded (native <details open>; still toggles on keyboard/touch). */
+  open?: boolean;
   /** Use for table-level "why this?" popovers inside rows. */
   table?: boolean;
 }
@@ -16,9 +18,19 @@ export interface DisclosureProps {
  * (.docs/AGENTS.md: native disclosures must work on keyboard/touch). Content
  * is plain DOM, so expanded explanations stay accessible without hover.
  */
-export function Disclosure({ summary, children, className, table = false }: DisclosureProps) {
+export function Disclosure({
+  summary,
+  children,
+  className,
+  open = false,
+  table = false,
+}: DisclosureProps) {
   return (
-    <details className={cn(table ? 'table-disclosure' : 'disclosure', className)}>
+    <details
+      className={cn(table ? 'table-disclosure' : 'disclosure', className)}
+      // Uncontrolled: `open` only seeds the initial state, then the user owns it.
+      {...(open ? { open: true } : {})}
+    >
       <summary>
         {summary}
         <Icon className="sm" name="i-chevron" />

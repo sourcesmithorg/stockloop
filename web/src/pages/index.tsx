@@ -2,62 +2,22 @@ import { Link, useParams } from 'react-router-dom';
 
 import { PageHead } from '@/components/layout/page-head';
 import { buttonClass, InlineNote } from '@/components/ui';
-import { USE_MOCK } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
-import { DEMO_DATE, STORE } from '@/lib/mock/fixtures';
 import { usePageTitle } from '@/lib/use-page-title';
 
 import { PlaceholderPage } from './placeholder';
 
+export { ImportsPage } from './imports';
+export { InventoryPage } from './inventory';
 export { LandingPage } from './landing';
 export { LoginPage } from './login';
 export { OnboardingPage } from './onboarding';
+export { OrdersPage } from './orders';
+export { OverviewPage } from './overview';
 export { RegisterPage } from './register';
+export { ReorderPage } from './reorder';
 export { SettingsPage } from './settings';
+export { SuppliersPage } from './suppliers';
 export { WelcomePage } from './welcome';
-
-export function OverviewPage() {
-  const { store } = useAuth();
-  // Real session store name; fixtures only in demo builds — never hardcoded.
-  const storeName = store?.name ?? (USE_MOCK ? STORE.name : null);
-  return (
-    <PlaceholderPage
-      actions={
-        <Link className={buttonClass('primary')} to="/reorder">
-          Review restock plan
-        </Link>
-      }
-      description={
-        storeName
-          ? `Here’s what deserves a look at ${storeName} today.`
-          : 'Here’s what deserves a look today.'
-      }
-      docTitle="Overview"
-      eyebrow={USE_MOCK ? DEMO_DATE.label : undefined}
-      note="Scoped restock suggestions, priority table, freshness, budget and activity — fed by GET /api/inventory/risk and GET /api/plans/{id}."
-      owner="Overview workstream"
-      title={
-        <>
-          A little foresight.
-          <br />A fuller shelf.
-        </>
-      }
-    />
-  );
-}
-
-export function InventoryPage() {
-  return (
-    <PlaceholderPage
-      description="Stock, demand, cover and lead time for every product in the store."
-      docTitle="Inventory"
-      eyebrow="Inventory"
-      note="Identity, stock, demand, cover, lead time and risk state with search/filter/pagination — fed by GET /api/products and GET /api/inventory/risk. Scrolling stays inside the labeled table region."
-      owner="Inventory workstream"
-      title="Every shelf has a story."
-    />
-  );
-}
 
 export function ProductPage() {
   const { productId = 'unknown' } = useParams();
@@ -69,19 +29,6 @@ export function ProductPage() {
       note={`Why this product is risky: inputs, supplier terms, explanation and SKU-scale history — fed by GET /api/products/${productId}.`}
       owner="Product workstream"
       title={`Product · ${productId}`}
-    />
-  );
-}
-
-export function ReorderPage() {
-  return (
-    <PlaceholderPage
-      description="Edit quantities, review supplier groups and totals, approve when it looks right."
-      docTitle="Reorder studio"
-      eyebrow="Reorder studio"
-      note="Entry point to editable plan lines with the apricot totals/constraint rail — plans are opened at /plans/:planId and fed by GET /api/plans/{id} plus POST /api/plans/{id}/lines/{lineId}."
-      owner="Reorder workstream"
-      title="A thoughtful restock."
     />
   );
 }
@@ -100,19 +47,6 @@ export function PlanPage() {
   );
 }
 
-export function OrdersPage() {
-  return (
-    <PlaceholderPage
-      description="Exact approved documents, one supplier and one currency each."
-      docTitle="Purchase orders"
-      eyebrow="Purchase orders"
-      note="List of approved purchase orders with document status, export attempts and source plan version — fed by GET /api/orders."
-      owner="Orders workstream"
-      title="From a plan to paper."
-    />
-  );
-}
-
 export function OrderDetailPage() {
   const { orderId = 'unknown' } = useParams();
   return (
@@ -127,25 +61,6 @@ export function OrderDetailPage() {
   );
 }
 
-export function SuppliersPage() {
-  return (
-    <PlaceholderPage
-      description="Terms, packs, MOQs and lead times that shape every suggestion."
-      docTitle="Suppliers"
-      eyebrow="Suppliers"
-      note="Supplier directory with currency, delivery calendar and verification freshness — fed by GET /api/suppliers."
-      owner="Suppliers workstream"
-      title={
-        <>
-          Good relationships.
-          <br />
-          Better replenishment.
-        </>
-      }
-    />
-  );
-}
-
 export function SupplierPage() {
   const { supplierId = 'unknown' } = useParams();
   return (
@@ -156,19 +71,6 @@ export function SupplierPage() {
       note={`Reviewed terms, products and last-verified details — fed by GET /api/suppliers/${supplierId}. Calendar versus business-day lead times stay explicit.`}
       owner="Suppliers workstream"
       title={`Supplier · ${supplierId}`}
-    />
-  );
-}
-
-export function ImportsPage() {
-  return (
-    <PlaceholderPage
-      description="Bring stock and sales in from a spreadsheet."
-      docTitle="Data imports"
-      eyebrow="Data imports"
-      note="Readiness and dataset sources with schema/format help — fed by POST /api/imports/preview. Distinguish no data from no matches; commit only when valid."
-      owner="Imports workstream"
-      title="Better data. Better decisions."
     />
   );
 }
@@ -257,7 +159,7 @@ export function NotFoundPage() {
             </Link>
           </li>
         </ul>
-        <InlineNote tone="info" title="If you followed a link from an old screen">
+        <InlineNote title="If you followed a link from an old screen">
           Record IDs are stable, but fixtures only contain the demo records (PLAN-001,
           PO-2026-0041/0042, SUP-001/002, the seven demo SKUs). Anything else is missing or deleted
           until the real API serves it.

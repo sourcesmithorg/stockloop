@@ -42,7 +42,7 @@ describe('first-run completion (lockout regression)', () => {
     ).toBeInTheDocument();
   });
 
-  it('completing onboarding flips /me and admits the empty store to /overview', async () => {
+  it('onboarding asks only name + region + interface and submits derived currency/timezone', async () => {
     const user = userEvent.setup();
     await seedRegistration('fr-two@example.test');
 
@@ -51,6 +51,20 @@ describe('first-run completion (lockout regression)', () => {
     await screen.findByRole('heading', { level: 1, name: /Local to you/ });
     expect((await mockApi.me()).firstRunComplete).toBe(false);
 
+    // Reduced field set: exactly three inputs; currency, timezone and catalog size are gone.
+    expect(screen.getByLabelText(/Store name/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Store country')).toBeInTheDocument();
+    expect(screen.getByLabelText('Interface language')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Store currency')).toBeNull();
+    expect(screen.queryByLabelText('Store timezone')).toBeNull();
+    expect(screen.queryByLabelText('Catalog size')).toBeNull();
+
+    // The derived values are visible before submit (JP → JPY / Asia/Tokyo).
+    await user.selectOptions(screen.getByLabelText('Store country'), 'JP');
+    const suggestion = screen.getByText(/Following your region/);
+    expect(suggestion).toHaveTextContent('JPY');
+    expect(suggestion).toHaveTextContent('Asia/Tokyo');
+
     // Complete setup through the real form (explicit completeFirstRun flag).
     await user.click(screen.getByRole('button', { name: /Complete setup/ }));
 
@@ -58,10 +72,17 @@ describe('first-run completion (lockout regression)', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: /A fresh start/ }),
     ).toBeInTheDocument();
-    expect((await mockApi.me()).firstRunComplete).toBe(true);
+    const me = await mockApi.me();
+    expect(me.firstRunComplete).toBe(true);
+    // The derived values were actually submitted, not just shown — and language
+    // stayed the user's own choice (never derived from the country).
+    expect(me.store.name).toBe('Fresh Store');
+    expect(me.store.countryCode).toBe('JP');
+    expect(me.store.defaultCurrency).toBe('JPY');
+    expect(me.store.timezone).toBe('Asia/Tokyo');
+    expect(me.preferences.locale).toBe('en');
 
-    // The lockout case itself: the store has no products and no imports, yet
-    // the app admits it — data readiness no longer gates entry.
+    // The lockout case: this store has no products and no imports, yet the app admits it.
     renderApp('/overview');
     expect(
       await screen.findByRole('heading', { level: 1, name: /A little foresight/ }),

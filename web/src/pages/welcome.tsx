@@ -85,8 +85,8 @@ export function WelcomePage() {
         {store && preferences && (
           <p className="small muted mt-24">
             Region: {optionLabel(COUNTRIES, store.countryCode)} ·{' '}
-            {optionLabel(LANGUAGES, preferences.locale)} · {preferences.displayCurrency} ·{' '}
-            {store.timezone}.{' '}
+            {optionLabel(LANGUAGES, preferences.locale ?? store.locale)} ·{' '}
+            {preferences.displayCurrency ?? store.defaultCurrency} · {store.timezone}.{' '}
             <Link className="text-link" to="/settings#region">
               Review regional settings
             </Link>

@@ -25,5 +25,8 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: false,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // Full-suite runs exceed vitest's 5s default under transform load (the
+    // settings suite already passed explicit 20s locally — this makes it global).
+    testTimeout: 20_000,
   },
 });

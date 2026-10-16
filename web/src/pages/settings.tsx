@@ -54,14 +54,17 @@ function RegionForm({
   const { updateStore, updatePreferences, refresh } = useAuth();
 
   const [country, setCountry] = useState(initialStore.countryCode);
-  const [language, setLanguage] = useState(initialPreferences.locale);
-  const [currency, setCurrency] = useState(initialPreferences.displayCurrency);
+  // Unset preference fields arrive as null — fall back to the store's values.
+  const initialLanguage = initialPreferences.locale ?? initialStore.locale;
+  const initialCurrency = initialPreferences.displayCurrency ?? initialStore.defaultCurrency;
+  const [language, setLanguage] = useState(initialLanguage);
+  const [currency, setCurrency] = useState(initialCurrency);
   const [timezone, setTimezone] = useState(initialStore.timezone);
   // Last known-saved form state: dirty = any field differs from it.
   const [baseline, setBaseline] = useState<FormState>({
     country: initialStore.countryCode,
-    language: initialPreferences.locale,
-    currency: initialPreferences.displayCurrency,
+    language: initialLanguage,
+    currency: initialCurrency,
     timezone: initialStore.timezone,
   });
   const [save, setSave] = useState<SaveState>({ phase: 'idle' });

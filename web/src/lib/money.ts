@@ -1,27 +1,29 @@
-import type { Money } from '@/lib/api';
+import type { DecimalString } from '@/lib/api';
 
 /**
- * Money is stored as integer minor units plus an ISO currency — never a float.
- * Fixtures use USD cents (38400 = $384.00).
+ * Money arrives from the backend as an exact decimal string plus an ISO
+ * currency ("2.50" + "USD"). Formatting to localized display text is the only
+ * place a float is involved; arithmetic, totals and budgets stay server-side.
+ * Currencies are never combined — every call carries its own currency.
  */
-export function usd(amountMinor: number): Money {
-  return { amountMinor, currency: 'USD' };
-}
-
-/** Fractional digits the currency actually uses (USD 2, JPY 0, KWD 3). */
-function minorUnitDigits(currency: string): number {
-  return (
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).resolvedOptions().maximumFractionDigits ?? 2
-  );
-}
-
-export function formatMoney(money: Money): string {
-  const value = money.amountMinor / 10 ** minorUnitDigits(money.currency);
+export function formatMoney(value: DecimalString, currency: string): string {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return `${value} ${currency}`;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: money.currency,
-  }).format(value);
+    currency,
+  }).format(parsed);
+}
+
+/** Money + explicit ISO code ("$240.00 USD") for document totals. */
+export function formatMoneyWithCode(value: DecimalString, currency: string): string {
+  return `${formatMoney(value, currency)} ${currency}`;
+}
+
+/**
+ * Quantity display: keeps the backend's exact decimal text ("12", "2.79") —
+ * never re-rounded, never coerced to a number that could turn unknown into 0.
+ */
+export function formatQuantity(value: DecimalString, unit?: string): string {
+  return unit ? `${value} ${unit}` : value;
 }

@@ -69,6 +69,34 @@ function authResult(account: MockAccount): AuthResult {
   };
 }
 
+/**
+ * Read-only demo account (fixture, like the backend's seeded owner — not a
+ * real credential): exists so role-gated actions can be exercised in demo
+ * mode exactly as the backend's viewer role gates them.
+ */
+accounts.set('viewer@stockloop.test', {
+  password: 'Stockloop123!',
+  user: { id: 'user-viewer-demo', email: 'viewer@stockloop.test', role: 'viewer' },
+  store: {
+    id: 'store-demo-view',
+    name: 'Maple & Main',
+    countryCode: 'US',
+    locale: 'en',
+    defaultCurrency: 'USD',
+    timezone: 'UTC',
+    version: 1,
+    firstRunComplete: true,
+  },
+  preferences: {
+    locale: 'en',
+    displayCurrency: 'USD',
+    timezone: 'UTC',
+    dateFormat: 'mdy',
+    numberFormat: 'en',
+    version: 1,
+  },
+});
+
 export async function mockLogin(input: AuthCredentials): Promise<AuthResult> {
   await settle();
   const account = accounts.get(input.email);

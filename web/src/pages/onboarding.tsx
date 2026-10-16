@@ -9,15 +9,12 @@ import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import {
   COUNTRIES,
-  CURRENCIES,
   DEFAULT_COUNTRY,
-  DEFAULT_CURRENCY,
   DEFAULT_LANGUAGE,
-  DEFAULT_TIMEZONE,
   LANGUAGES,
-  TIMEZONES,
   type RegionOption,
 } from '@/lib/region-data';
+import { countryDefaults } from '@/lib/region-defaults';
 import { usePageTitle } from '@/lib/use-page-title';
 
 function options(list: RegionOption[]) {
@@ -28,8 +25,15 @@ function options(list: RegionOption[]) {
   ));
 }
 
-/** Store setup — .template/onboarding.html (step 2 of the registration flow).
- * Reached via the guard for sessions that have not completed their first run. */
+// Fields this form actually renders; anything else surfaces in the alert below.
+const RENDERED_FIELDS = ['name', 'storeName', 'country', 'language'] as const;
+
+/** Store setup — the owner's reduced flow (store name + region + interface
+ * language only). Currency and timezone are not asked: they follow the selected
+ * region as visible first-run suggestions and stay editable in /settings.
+ * Catalog size was also dropped (it never had an API field). Both are deliberate
+ * divergences from .template/onboarding.html — the owner asked for a less
+ * overwhelming onboarding. */
 export function OnboardingPage() {
   usePageTitle('Set up your store');
   const navigate = useNavigate();
@@ -38,23 +42,29 @@ export function OnboardingPage() {
   const [name, setName] = useState(store?.name ?? '');
   const [country, setCountry] = useState(store?.countryCode ?? DEFAULT_COUNTRY);
   const [language, setLanguage] = useState(preferences?.locale ?? DEFAULT_LANGUAGE);
-  const [currency, setCurrency] = useState(preferences?.displayCurrency ?? DEFAULT_CURRENCY);
-  const [timezone, setTimezone] = useState(store?.timezone ?? DEFAULT_TIMEZONE);
-  // ponytail: catalog size has no API field; kept for template fidelity.
-  const [catalogSize, setCatalogSize] = useState('small');
   const [error, setError] = useState<{ message: string; field?: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // First-run values only: derived from the selected region, shown below, and
+  // submitted explicitly — never silently. Settings keeps full control later;
+  // changing country in /settings must NOT re-derive these (T-05).
+  const derived = countryDefaults(country);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
-      // Completion is an explicit one-way flag (completeFirstRun), never inferred
-      // from the region values being saved.
-      await updateStore({ name, country, timezone, completeFirstRun: true });
-      if (language !== preferences?.locale || currency !== preferences?.displayCurrency) {
-        await updatePreferences({ locale: language, displayCurrency: currency });
+      await updateStore({
+        name,
+        country,
+        defaultCurrency: derived.currency,
+        timezone: derived.timezone,
+        // Explicit, one-way completion flag — never inferred from region saves.
+        completeFirstRun: true,
+      });
+      if (language !== preferences?.locale) {
+        await updatePreferences({ locale: language });
       }
       await refresh();
       navigate('/welcome', { replace: true });
@@ -78,7 +88,10 @@ export function OnboardingPage() {
         <br />
         Ready for anywhere.
       </h1>
-      <p className="intro">Start with English and USD, or choose your store’s region.</p>
+      <p className="intro">
+        Your store's name, region, and language. Currency and timezone follow the region — you can
+        change them any time in Settings.
+      </p>
       <form className="stack" onSubmit={handleSubmit}>
         <Field error={fieldError('name') ?? fieldError('storeName')} label="Store name" required>
           <Input
@@ -92,7 +105,7 @@ export function OnboardingPage() {
         <div className="field-grid two">
           <Field
             error={fieldError('country')}
-            help="ISO country choices. No currency is inferred or converted."
+            help="ISO country choices. Currency and timezone follow this region."
             label="Store country"
           >
             <Select onChange={(event) => setCountry(event.target.value)} value={country}>
@@ -108,39 +121,23 @@ export function OnboardingPage() {
               {options(LANGUAGES)}
             </Select>
           </Field>
-          <Field
-            error={fieldError('currency')}
-            help="Amounts display in this currency after integration."
-            label="Store currency"
-          >
-            <Select onChange={(event) => setCurrency(event.target.value)} value={currency}>
-              {options(CURRENCIES)}
-            </Select>
-          </Field>
-          <Field
-            error={fieldError('timezone')}
-            help="Used for sales windows and delivery-date cutoffs."
-            label="Store timezone"
-          >
-            <Select onChange={(event) => setTimezone(event.target.value)} value={timezone}>
-              {options(TIMEZONES)}
-            </Select>
-          </Field>
         </div>
-        <Field label="Catalog size">
-          <Select onChange={(event) => setCatalogSize(event.target.value)} value={catalogSize}>
-            <option value="small">Up to 250 products</option>
-            <option value="medium">251 to 1,000 products</option>
-            <option value="large">More than 1,000 products</option>
-          </Select>
-        </Field>
-        {error && !error.field && (
-          <div role="alert">
-            <InlineNote tone="bad" title="Could not save your store setup">
-              {error.message}
-            </InlineNote>
-          </div>
-        )}
+        <p className="data-note">
+          <Icon name="i-info" />
+          <span>
+            Following your region: currency <strong>{derived.currency}</strong> and timezone{' '}
+            <strong>{derived.timezone}</strong>. These are starting values — review and change them
+            any time in <strong>Settings → Region</strong>.
+          </span>
+        </p>
+        {error &&
+          !(error.field && (RENDERED_FIELDS as readonly string[]).includes(error.field)) && (
+            <div role="alert">
+              <InlineNote tone="bad" title="Could not save your store setup">
+                {error.message}
+              </InlineNote>
+            </div>
+          )}
         <Button
           className="w-full"
           loading={submitting}
@@ -155,8 +152,9 @@ export function OnboardingPage() {
       <p className="data-note">
         <Icon name="i-info" />
         <span>
-          Country, language, currency, and timezone are saved exactly as chosen. Nothing is
-          translated, converted, or inferred.
+          Country and language are saved exactly as you choose. Currency and timezone start from
+          your region's defaults — editable any time in Settings. Nothing is translated or
+          converted.
         </span>
       </p>
     </AuthLayout>

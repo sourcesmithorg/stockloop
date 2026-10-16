@@ -7,27 +7,28 @@ export type { ApiErrorDetail } from './errors';
 
 /**
  * StockLoop API contract — mirrors the FastAPI backend on http://localhost:8000
- * (proxied in dev). The same `ApiClient` interface is implemented twice:
- * `httpApi` (real) and `mockApi` (fixtures). Select with the single toggle at
- * the bottom: VITE_USE_MOCK=true (default) serves fixtures; =false hits /api.
+ * (proxied in dev and by nginx in the container). The same `ApiClient`
+ * interface is implemented twice: `httpApi` (real) and `mockApi` (fixtures).
+ * Select with the single toggle at the bottom: VITE_USE_MOCK=true (default)
+ * serves fixtures; =false hits /api.
+ *
+ * Shapes below mirror api/app/schemas.py field-for-field (camelCase aliases,
+ * Decimal serialized as a JSON string, discriminated `kind` unions). An
+ * absent value is a distinct "unknown" variant — never a bare zero.
  */
 
 // ---- Money & known-or-unknown shapes -------------------------------------
 
-/** Integer minor units + ISO currency. 38400 USD = $384.00. Never a float. */
-export interface Money {
-  amountMinor: number;
-  currency: string;
-}
+/** Backend Decimal, serialized as an exact JSON string ("2.50", "384.00"). */
+export type DecimalString = string;
 
 /**
- * Discriminated known-or-unknown wrappers: unknown values carry a reason and
- * are NEVER represented as a bare zero or bare number.
+ * Discriminated known-or-unknown wrappers: unknown variants carry a reason
+ * and are NEVER represented as a bare zero or bare number.
  */
 export interface Known<T> {
   kind: 'known';
   value: T;
-  asOf?: string;
 }
 
 export interface Unknown {
@@ -37,34 +38,203 @@ export interface Unknown {
 
 export type Maybe<T> = Known<T> | Unknown;
 
-export type StockValue = Maybe<number>;
+export interface Issue {
+  code: string;
+  message: string;
+}
 
-export type SalesValue =
-  | {
-      kind: 'measured';
-      totalUnits: number;
-      coveredDays: number;
-      windowStart: string;
-      windowEnd: string;
-    }
-  | { kind: 'zeroVerified'; windowStart: string; windowEnd: string }
-  | { kind: 'missing'; reason: string };
+// ---- Inventory risk view (GET /inventory/risk, embedded in products) ------
 
-export type CoverDaysValue =
-  | { kind: 'finite'; days: number }
-  | { kind: 'noRecentSales' }
-  | { kind: 'unavailable'; reason: string };
+export interface StockKnown {
+  kind: 'known';
+  value: DecimalString;
+  unit: string;
+  asOf: string;
+}
+
+export interface StockUnknown {
+  kind: 'unknown';
+  reason: string;
+}
+
+export type StockValue = StockKnown | StockUnknown;
+
+export interface SalesMeasured {
+  kind: 'measured';
+  total: DecimalString;
+  coveredDays: number;
+  windowStart: string;
+  windowEnd: string;
+}
+
+export interface SalesZeroVerified {
+  kind: 'zeroVerified';
+  coveredDays: number;
+  windowStart: string;
+  windowEnd: string;
+}
+
+export interface SalesMissing {
+  kind: 'missing';
+  reason: string;
+}
+
+export type SalesValue = SalesMeasured | SalesZeroVerified | SalesMissing;
+
+export interface DemandKnown {
+  kind: 'known';
+  value: DecimalString;
+}
+
+export interface DemandUnavailable {
+  kind: 'unavailable';
+  reason: string;
+}
+
+export type DemandValue = DemandKnown | DemandUnavailable;
+
+export interface CoverFinite {
+  kind: 'finite';
+  value: DecimalString;
+}
+
+export interface CoverNoRecentSales {
+  kind: 'noRecentSales';
+  reason: string;
+}
+
+export interface CoverUnavailable {
+  kind: 'unavailable';
+  reason: string;
+}
+
+export type CoverDaysValue = CoverFinite | CoverNoRecentSales | CoverUnavailable;
+
+export interface LeadKnown {
+  kind: 'known';
+  value: number;
+  unit: string;
+  termsVersion: number;
+  calendarConfirmed: boolean;
+}
+
+export interface LeadUnavailable {
+  kind: 'unavailable';
+  reason: string;
+}
+
+export type LeadTimeValue = LeadKnown | LeadUnavailable;
+
+export interface DepletionKnown {
+  kind: 'known';
+  date: string;
+}
+
+export interface DepletionUnavailable {
+  kind: 'unavailable';
+  reason: string;
+}
+
+export type DepletionValue = DepletionKnown | DepletionUnavailable;
+
+export interface DeliveryKnown {
+  kind: 'known';
+  date: string;
+  /** Calendar lower bound unless confirmed — never a promised slot. */
+  confirmed: boolean;
+  reason: string;
+}
+
+export interface DeliveryUnavailable {
+  kind: 'unavailable';
+  reason: string;
+  confirmed: false;
+}
+
+export type DeliveryEstimate = DeliveryKnown | DeliveryUnavailable;
+
+export interface GapFinite {
+  kind: 'finite';
+  value: DecimalString;
+  unit: 'days';
+}
+
+export interface GapUnavailable {
+  kind: 'unavailable';
+  reason: string;
+}
+
+export type DeliveryGap = GapFinite | GapUnavailable;
 
 export type RiskState =
   'outOfStock' | 'atRisk' | 'runningLow' | 'healthy' | 'noRecentSales' | 'dataNeeded' | 'stale';
 
-/** Calendar lower bound unless explicitly confirmed — never a promised slot. */
-export type DeliveryEstimate =
-  | { kind: 'estimated'; date: string; confirmed: false; note: string }
-  | { kind: 'confirmed'; date: string; confirmed: true }
-  | { kind: 'unavailable'; confirmed: false; reason: string };
+/** Freshness evidence per screen: what data this view was derived from. */
+export interface SourceVersions {
+  stockSnapshotId: string | null;
+  salesThrough: string | null;
+  termsVersion: number | null;
+  policyVersion: string;
+}
 
-// ---- Catalog & suppliers --------------------------------------------------
+export interface InventoryRiskView {
+  productId: string;
+  sku: string;
+  name: string;
+  category: string;
+  baseUnit: string;
+  stock: StockValue;
+  sales: SalesValue;
+  averageDailyDemand: DemandValue;
+  coverDays: CoverDaysValue;
+  leadTime: LeadTimeValue;
+  estimatedDepletion: DepletionValue;
+  deliveryEstimate: DeliveryEstimate;
+  deliveryGap: DeliveryGap;
+  riskState: RiskState;
+  blockers: Issue[];
+  warnings: Issue[];
+  sourceVersions: SourceVersions;
+}
+
+// ---- Catalog ---------------------------------------------------------------
+
+export interface SupplierBrief {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface Supplier {
+  id: string;
+  code: string;
+  name: string;
+  contactEmail: string | null;
+  documentCurrency: string;
+  leadTimeDays: number;
+  /** Weekdays as integers (0=Mon … 6=Sun); null = no delivery calendar. */
+  deliveryDays: number[] | null;
+  calendarConfirmed: boolean;
+  lastVerifiedAt: string | null;
+  version: number;
+}
+
+export interface SupplierTerms {
+  id: string;
+  supplierId: string;
+  unitCost: DecimalString;
+  currency: string;
+  purchasePackUnits: number;
+  minimumOrderUnits: DecimalString;
+  leadTimeValue: number;
+  leadTimeUnit: string;
+  version: number;
+}
+
+export interface SalesPoint {
+  date: string;
+  quantity: DecimalString;
+}
 
 export interface Product {
   id: string;
@@ -72,259 +242,237 @@ export interface Product {
   name: string;
   category: string;
   baseUnit: string;
+  quantityPrecision: number;
+  status: string;
+  supplier: SupplierBrief | null;
+  terms: SupplierTerms | null;
+  risk: InventoryRiskView;
 }
 
 export interface ProductDetail extends Product {
-  stock: StockValue;
-  sales: SalesValue;
-  coverDays: CoverDaysValue;
-  riskState: RiskState;
-  supplierTerms: SupplierTerms[];
-  dailySales: { date: string; units: number }[];
-  estimatedDepletionDays: Maybe<number>;
-  deliveryEstimate: DeliveryEstimate;
+  salesSeries: SalesPoint[];
 }
 
-export interface SupplierTerms {
-  productId: string;
-  supplierId: string;
-  unitCost: Money;
-  purchasePackUnits: number;
-  minimumOrderUnits: number;
-  leadTimeDays: number;
-}
+// ---- Plans -----------------------------------------------------------------
 
-export interface Supplier {
-  id: string;
-  code: string;
-  name: string;
-  contactName: string | null;
-  email: string | null;
-  documentCurrency: string;
-  leadTimeDays: number;
-  /** Weekdays this supplier delivers, e.g. ['Mon', … 'Fri']. */
-  deliveryDays: string[];
-  cutoffTime: string | null;
-  lastVerifiedAt: string | null;
-}
-
-export interface SupplierDetail extends Supplier {
-  terms: SupplierTerms[];
-  products: { productId: string; sku: string; name: string }[];
-}
-
-export interface InventoryRiskItem {
-  productId: string;
-  sku: string;
-  name: string;
-  stock: StockValue;
-  sales: SalesValue;
-  coverDays: CoverDaysValue;
-  averageDailyDemand: Maybe<number>;
-  leadTimeDays: Maybe<number>;
-  riskState: RiskState;
-  blockers: string[];
-  warnings: string[];
-}
-
-// ---- Restock plan ---------------------------------------------------------
-
-export type PlanStatus = 'draft' | 'reviewed' | 'approved' | 'stale';
 export type CalculationStatus = 'pending' | 'valid' | 'blocked' | 'failed';
 
 export interface PlanLine {
   id: string;
   productId: string;
   sku: string;
-  name: string;
+  productName: string;
   supplierId: string;
   supplierName: string;
   selected: boolean;
-  suggestedBaseUnits: number;
-  /** Owner's edit; null = using the suggestion. */
-  editedBaseUnits: number | null;
+  originalSuggestedBaseUnits: DecimalString;
+  editedBaseUnits: DecimalString | null;
+  effectiveBaseUnits: DecimalString;
   purchasePackUnits: number;
   purchasePackCount: number;
-  /** Raw demand before pack/MOQ rounding; null when not derived by a formula. */
-  rawRequiredUnits: number | null;
-  /** Units above raw demand from pack/MOQ rounding; null when not derived. */
-  excessUnits: number | null;
-  unitCost: Money;
-  lineTotal: Money;
-  deliveryEstimate: DeliveryEstimate;
-  explanation: string | null;
+  unitCost: DecimalString;
+  currency: string;
+  lineTotal: DecimalString;
+  termsVersion: number;
+  ruleTrace: Record<string, unknown>;
+  constraintResults: { code: string; status: string }[];
+  explanation: string;
+}
+
+/** Per-currency budget view. Tax/shipping are excluded, never zero. */
+export interface BudgetStatus {
+  currency: string;
+  budgetAmount: DecimalString | null;
+  selectedTotal: DecimalString;
+  remaining: DecimalString | null;
+  utilizationPercent: DecimalString | null;
+  taxTreatment: string;
+  shippingTreatment: string;
 }
 
 export interface SupplierGroup {
   supplierId: string;
+  supplierCode: string;
   supplierName: string;
   currency: string;
-  subtotal: Money;
-  lineIds: string[];
+  leadTimeDays: number;
+  lineCount: number;
+  subtotal: DecimalString;
 }
 
-export interface PlanBudget {
-  currency: string;
-  budgetMinor: number;
-  totalMinor: number;
-  remainingMinor: number;
-  utilizationPercent: number;
-  taxIncluded: boolean;
-  shippingIncluded: boolean;
-}
-
-export interface Plan {
+export interface PlanSummary {
   id: string;
-  status: PlanStatus;
   version: number;
-  explanationSource: 'ai' | 'rule-based';
   calculationStatus: CalculationStatus;
-  lines: PlanLine[];
-  supplierGroups: SupplierGroup[];
-  budgets: PlanBudget[];
-  blockers: string[];
-  warnings: string[];
+  reviewStatus: string;
+  totalsByCurrency: Record<string, DecimalString>;
+  activeApprovalId: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
-export interface UpdatePlanLineInput {
-  expectedPlanVersion: number;
-  editedBaseUnits?: number | null;
-  selected?: boolean;
-}
-
-export interface ApprovePlanInput {
-  expectedPlanVersion: number;
-  lineIds?: string[];
-  acknowledgedWarnings?: string[];
+export interface OrderSummary {
+  id: string;
+  displayNumber: string;
+  supplierId: string;
+  supplierName: string;
+  currency: string;
+  itemSubtotal: DecimalString;
+  taxTreatment: string;
+  shippingTreatment: string;
+  documentStatus: string;
+  approvalId: string;
+  approvalStatus: string | null;
+  planId: string;
+  productCount: number;
+  totalUnits: DecimalString;
+  createdAt: string;
 }
 
 export interface Approval {
   id: string;
   planId: string;
   planVersion: number;
-  lineIds: string[];
   contentDigest: string;
-  approvedAt: string;
   actorId: string;
+  approvedAt: string;
+  status: string;
+  acknowledgedWarnings: string[];
+  orders: OrderSummary[];
 }
 
-// ---- Purchase orders ------------------------------------------------------
-
-export type DocumentStatus = 'draft' | 'ready' | 'exported' | 'stale';
-
-export interface PurchaseOrder {
-  id: string;
-  displayNumber: string;
-  supplierId: string;
-  supplierName: string;
-  currency: string;
-  documentStatus: DocumentStatus;
-  itemSubtotal: Money;
-  taxTreatment: string;
-  shippingTreatment: string;
-  createdAt: string;
-  approvalId: string;
-  sourcePlanVersion: number;
+export interface PlanDetail extends PlanSummary {
+  storeId: string;
+  policyVersion: string;
+  explanationSource: 'ai' | 'rule-based';
+  sourceVersions: Record<string, unknown>;
+  budgets: BudgetStatus[];
+  supplierGroups: SupplierGroup[];
+  lines: PlanLine[];
+  blockers: Issue[];
+  warnings: Issue[];
+  activeApproval: Approval | null;
 }
 
-export interface OrderLine {
+export interface UpdatePlanLineInput {
+  editedBaseUnits: DecimalString;
+  expectedPlanVersion: number;
+}
+
+export interface ApprovePlanInput {
+  expectedPlanVersion: number;
+  acknowledgedWarnings?: string[];
+  actorId?: string;
+}
+
+// ---- Purchase orders -------------------------------------------------------
+
+export interface OrderLineSnapshot {
   productId: string;
   sku: string;
-  name: string;
-  baseUnits: number;
+  productName: string;
+  supplierId: string;
+  baseUnits: DecimalString;
   purchasePackUnits: number;
   purchasePackCount: number;
-  unitCost: Money;
-  lineTotal: Money;
+  unitCost: DecimalString;
+  currency: string;
+  lineTotal: DecimalString;
 }
 
-export interface ExportAttempt {
-  id: string;
-  status: 'pending' | 'succeeded' | 'failed' | 'unknown';
-  startedAt: string;
-  completedAt: string | null;
-  artifactName: string | null;
-  failureCode: string | null;
+export interface OrderDetail extends OrderSummary {
+  planVersion: number | null;
+  lines: OrderLineSnapshot[];
+  supplierSnapshot: Record<string, unknown>;
+  disclaimer: string;
 }
 
-export interface PurchaseOrderDetail extends PurchaseOrder {
-  lines: OrderLine[];
-  exports: ExportAttempt[];
-}
+// ---- Imports ---------------------------------------------------------------
 
-// ---- Imports --------------------------------------------------------------
-
-export type ImportDataset = 'stock' | 'sales' | 'products' | 'suppliers';
-export type ImportStatus = 'mapping' | 'validating' | 'valid' | 'invalid' | 'committed';
-
-export interface PreviewImportInput {
-  dataset: ImportDataset;
-  filename: string;
-  content?: string;
-  mapping?: Record<string, string>;
-}
+/** Backend datasets (app/services/imports.py REQUIRED_COLUMNS). */
+export type ImportDataset = 'inventory' | 'sales';
 
 export interface ImportIssue {
-  rowNumber: number;
-  field: string;
+  rowNumber: number | null;
+  field: string | null;
   issueCode: string;
-  severity: 'blocking' | 'warning';
-  /** Pre-redacted preview of the offending value; treat as untrusted text. */
-  valuePreview: string;
-  expectedFormat: string;
-  correctionHint: string;
+  severity: string;
+  valuePreview: string | null;
+  expectedFormat: string | null;
+  correctionHint: string | null;
 }
 
-export interface ImportPreview {
-  id: string;
-  dataset: ImportDataset;
-  filename: string;
-  status: ImportStatus;
-  availableColumns: string[];
-  requiredColumns: string[];
-  mapping: Record<string, string>;
+export interface ImportCounts {
   totalRows: number;
   validRows: number;
   warningRows: number;
   rejectedRows: number;
-  issues: ImportIssue[];
 }
 
-export interface CommitImportInput {
-  idempotencyKey: string;
+export interface ImportPreview {
+  importId: string;
+  dataset: string;
+  filename: string;
+  byteSize: number;
+  sourceDigest: string;
+  schemaVersion: string;
+  commitPolicy: string;
+  /** previewed → validated | blocked; committed after a commit. */
+  status: string;
+  mapping: Record<string, string>;
+  counts: ImportCounts;
+  issues: ImportIssue[];
+  createdAt: string;
+}
+
+export interface PreviewImportInput {
+  file: File;
+  dataset: ImportDataset;
 }
 
 export interface ImportResult {
   importId: string;
-  status: 'committed';
-  resultingVersion: number;
-  totalRows: number;
-  importedRows: number;
+  dataset: string;
+  status: string;
+  appliedRows: number;
   skippedRows: number;
+  resultingStoreVersion: number;
   committedAt: string;
 }
 
-// ---- AI boundary ----------------------------------------------------------
+// ---- AI boundary -----------------------------------------------------------
 
 export interface ExplainInput {
-  question: string;
-  planId?: string;
-  planVersion?: number;
-  lineId?: string;
   productId?: string;
+  planId?: string;
+  language?: string;
+  /** 'rule-only' skips the provider and returns the deterministic explanation. */
+  mode?: 'auto' | 'rule-only';
 }
 
-/** `source` labels the provenance: AI-assisted vs deterministic explanation. */
-export interface ExplainResponse {
+export interface AiExplanation {
+  productId: string;
+  sku: string | null;
+  summary: string;
+  citedInputKeys: string[];
+  assumptions: string[];
+  riskCodes: string[];
+}
+
+/** `source` labels provenance: AI-assisted vs deterministic rule-based. */
+export interface AiExplainResponse {
   source: 'ai' | 'rule-based';
-  text: string;
-  model: string | null;
-  fallbackReason: string | null;
+  reason: string | null;
+  requestId: string;
+  planId: string | null;
+  planVersion: number | null;
+  productId: string | null;
+  explanations: AiExplanation[];
 }
 
 export interface HealthResponse {
-  status: 'ok' | 'degraded' | 'error';
+  status: 'ok' | 'degraded';
+  db: { reachable: boolean; latencyMs: number | null; error: string | null };
   version: string;
 }
 
@@ -347,12 +495,13 @@ export interface Store {
   firstRunComplete: boolean;
 }
 
+/** Unset preference fields arrive as null — unknown, never a fabricated default. */
 export interface Preferences {
-  locale: string;
-  displayCurrency: string;
-  timezone: string;
-  dateFormat: string;
-  numberFormat: string;
+  locale: string | null;
+  displayCurrency: string | null;
+  timezone: string | null;
+  dateFormat: string | null;
+  numberFormat: string | null;
   version: number;
 }
 
@@ -420,23 +569,24 @@ export interface PreferencesUpdateInput {
   expectedVersion: number;
 }
 
-// ---- Client contract ------------------------------------------------------
+// ---- Client contract -------------------------------------------------------
 
 export interface ApiClient {
   getHealth(): Promise<HealthResponse>;
   getSuppliers(): Promise<Supplier[]>;
-  getSupplier(id: string): Promise<SupplierDetail>;
+  getSupplier(id: string): Promise<Supplier>;
   getProducts(): Promise<Product[]>;
   getProduct(id: string): Promise<ProductDetail>;
-  getInventoryRisk(): Promise<InventoryRiskItem[]>;
-  getPlan(id: string): Promise<Plan>;
-  updatePlanLine(planId: string, lineId: string, input: UpdatePlanLineInput): Promise<Plan>;
+  getInventoryRisk(): Promise<InventoryRiskView[]>;
+  getPlans(): Promise<PlanSummary[]>;
+  getPlan(id: string): Promise<PlanDetail>;
+  updatePlanLine(planId: string, lineId: string, input: UpdatePlanLineInput): Promise<PlanDetail>;
   approvePlan(planId: string, input: ApprovePlanInput): Promise<Approval>;
-  getOrders(): Promise<PurchaseOrder[]>;
-  getOrder(id: string): Promise<PurchaseOrderDetail>;
+  getOrders(): Promise<OrderSummary[]>;
+  getOrder(id: string): Promise<OrderDetail>;
   previewImport(input: PreviewImportInput): Promise<ImportPreview>;
-  commitImport(importId: string, input: CommitImportInput): Promise<ImportResult>;
-  explain(input: ExplainInput): Promise<ExplainResponse>;
+  commitImport(importId: string): Promise<ImportResult>;
+  explain(input: ExplainInput): Promise<AiExplainResponse>;
   login(input: AuthCredentials): Promise<AuthResult>;
   register(input: RegisterInput): Promise<AuthResult>;
   logout(): Promise<void>;
@@ -448,30 +598,43 @@ export interface ApiClient {
 
 // ---- HTTP implementation --------------------------------------------------
 
+async function parseError(path: string, response: Response): Promise<never> {
+  // Errors follow the {detail: {code, message, field?, currentVersion?}}
+  // envelope; a non-JSON body (proxy/HTML) falls back to the status line.
+  let detail: ApiErrorDetail | undefined;
+  try {
+    const body = (await response.json()) as { detail?: ApiErrorDetail };
+    detail = body.detail;
+  } catch {
+    // No JSON body to parse — keep the generic status message.
+  }
+  throw new ApiError(
+    response.status,
+    detail?.message ?? `${response.status} ${response.statusText} on ${path}`,
+    detail,
+  );
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...init,
   });
-  if (!response.ok) {
-    // Errors follow the {detail: {code, message, field?, currentVersion?}}
-    // envelope; a non-JSON body (proxy/HTML) falls back to the status line.
-    let detail: ApiErrorDetail | undefined;
-    try {
-      const body = (await response.json()) as { detail?: ApiErrorDetail };
-      detail = body.detail;
-    } catch {
-      // No JSON body to parse — keep the generic status message.
-    }
-    throw new ApiError(
-      response.status,
-      detail?.message ?? `${response.status} ${response.statusText} on ${path}`,
-      detail,
-    );
-  }
+  if (!response.ok) await parseError(path, response);
   // 204 No Content (e.g. logout) has no body to parse.
   if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
+/** Multipart upload (POST /imports/preview): the browser sets the boundary. */
+async function requestForm<T>(path: string, body: FormData): Promise<T> {
+  const response = await fetch(`/api${path}`, {
+    body,
+    credentials: 'include',
+    method: 'POST',
+  });
+  if (!response.ok) await parseError(path, response);
   return (await response.json()) as T;
 }
 
@@ -484,6 +647,7 @@ export const httpApi: ApiClient = {
   getProducts: () => request('/products'),
   getProduct: (id) => request(`/products/${encodeURIComponent(id)}`),
   getInventoryRisk: () => request('/inventory/risk'),
+  getPlans: () => request('/plans'),
   getPlan: (id) => request(`/plans/${encodeURIComponent(id)}`),
   updatePlanLine: (planId, lineId, input) =>
     request(
@@ -494,9 +658,14 @@ export const httpApi: ApiClient = {
     request(`/plans/${encodeURIComponent(planId)}/approve`, post(input)),
   getOrders: () => request('/orders'),
   getOrder: (id) => request(`/orders/${encodeURIComponent(id)}`),
-  previewImport: (input) => request('/imports/preview', post(input)),
-  commitImport: (importId, input) =>
-    request(`/imports/${encodeURIComponent(importId)}/commit`, post(input)),
+  previewImport: ({ file, dataset }) => {
+    const body = new FormData();
+    body.append('dataset', dataset);
+    body.append('file', file);
+    return requestForm('/imports/preview', body);
+  },
+  commitImport: (importId) =>
+    request(`/imports/${encodeURIComponent(importId)}/commit`, { method: 'POST' }),
   explain: (input) => request('/ai/explain', post(input)),
   login: (input) => request('/auth/login', post(input)),
   register: (input) => request('/auth/register', post(input)),
