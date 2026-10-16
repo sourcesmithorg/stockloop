@@ -23,7 +23,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    css: false,
+    // Real stylesheets in jsdom so computed-style tests (focus rings) are possible.
+    css: true,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     // Full-suite runs exceed vitest's 5s default under transform load (the
     // settings suite already passed explicit 20s locally — this makes it global).

@@ -274,6 +274,16 @@ def test_quantity_precision() -> None:
     assert quantize_quantity(Decimal("12.345"), 2) == Decimal("12.35")
 
 
+def test_ratio_str_never_emits_exponent_notation() -> None:
+    # normalize() would produce 3E+1 / 8E+1; the UI renders these strings
+    # verbatim, so they must be digits ("30", "80"), not scientific notation.
+    assert ratio_str(Decimal("30")) == "30"
+    assert ratio_str(Decimal("80")) == "80"
+    assert ratio_str(Decimal("4")) == "4"
+    assert ratio_str(Decimal("3.555")) == "3.56"
+    assert "E+" not in ratio_str(Decimal("30.00"))
+
+
 # ------------------------------------------------------------------ risk state derivation
 
 

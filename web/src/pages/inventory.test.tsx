@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+// Real stylesheets for computed-style assertions (vitest css:true).
+import '@/styles/cornerstore.css';
 
 import { api, ApiError } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth';
@@ -84,6 +86,36 @@ describe('inventory (live data)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(await screen.findByText('Oat milk 1 L')).toBeInTheDocument();
+  });
+
+  it('draws a visible focus indicator on the search field wrapper (M1 focus clause)', async () => {
+    await seedOwner('inv-focus@example.test');
+    renderInventory();
+    await screen.findByRole('table', { name: /Inventory list/ });
+
+    const input = screen.getByLabelText('Search products');
+    input.focus();
+    // Template design: the input suppresses its own ring; the .search-field
+    // wrapper draws it via :focus-within. Assert the pseudo applies and the
+    // loaded stylesheet carries the 3px outline — deleting either half of the
+    // wrapper-drawn indicator fails here. (jsdom cannot resolve var()-colored
+    // outline widths in computed style, so the rule text is the authority.)
+    const wrapper = input.closest('.search-field') as HTMLElement;
+    expect(wrapper.matches(':focus-within')).toBe(true);
+    const wrapperRingRule = Array.from(document.styleSheets).some((sheet) => {
+      try {
+        return Array.from(sheet.cssRules).some(
+          (rule) =>
+            rule.cssText.includes('.search-field:focus-within') &&
+            rule.cssText.includes('outline: 3px solid'),
+        );
+      } catch {
+        return false;
+      }
+    });
+    expect(wrapperRingRule).toBe(true);
+    const style = window.getComputedStyle(wrapper);
+    expect(style.outlineStyle).not.toBe('none');
   });
 
   it('surfaces an API failure and retries without losing the screen', async () => {

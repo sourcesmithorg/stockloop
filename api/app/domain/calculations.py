@@ -72,7 +72,10 @@ def ratio(value: Decimal) -> Decimal:
     """Display precision for derived ratios: 2 dp HALF_UP, trailing zeros trimmed."""
     if not value.is_finite():
         raise CalculationError(f"ratio must be finite, got {value}")
-    return value.quantize(_RATIO_SCALE, rounding=ROUND_HALF_UP).normalize()
+    trimmed = value.quantize(_RATIO_SCALE, rounding=ROUND_HALF_UP).normalize()
+    # normalize() can flip 30 into 3E+1; a serialized decimal must render as
+    # digits (fixed-point), never exponent notation.
+    return Decimal(format(trimmed, "f"))
 
 
 def ratio_str(value: Decimal) -> str:

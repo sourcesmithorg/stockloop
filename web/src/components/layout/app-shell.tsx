@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { USE_MOCK } from '@/lib/api';
 
 import { AppHeader } from './app-header';
 import { IconSprite } from './icon';
@@ -37,7 +38,11 @@ export function AppShell() {
         <main className="main" id="main-content" tabIndex={-1}>
           <Outlet />
           <footer className="page-footer">
-            <span>StockLoop demo · fixture data only — nothing here is a real order.</span>
+            <span>
+              {USE_MOCK
+                ? 'StockLoop demo · fixture data only — nothing here is a real order.'
+                : 'Live store data from this store — nothing is ordered without your approval.'}
+            </span>
             <span>Deterministic rules · human review</span>
           </footer>
         </main>

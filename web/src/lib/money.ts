@@ -7,6 +7,10 @@ import type { DecimalString } from '@/lib/api';
  * Currencies are never combined — every call carries its own currency.
  */
 export function formatMoney(value: DecimalString, currency: string): string {
+  // Guard: Number('') === 0 is finite — a blank amount would otherwise render
+  // as a fabricated $0.00. An amount that is not a real decimal never becomes
+  // a number; it falls back like unparseable input ('n/a USD').
+  if (value.trim() === '') return `Unknown ${currency}`;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return `${value} ${currency}`;
   return new Intl.NumberFormat('en-US', {

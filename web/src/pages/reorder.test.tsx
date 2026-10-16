@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
+import { api } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth';
 import { mockApi } from '@/lib/mock';
 
@@ -38,6 +39,10 @@ async function login(email: string, password = 'correct-horse-battery') {
 function qtyInput(product: string): HTMLInputElement {
   return screen.getByRole('spinbutton', { name: `Proposed units for ${product}` });
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('reorder studio (live plan)', () => {
   // File order matters: the mock plan is module state, so read-only checks run
@@ -136,4 +141,23 @@ describe('reorder studio (live plan)', () => {
     expect(screen.getByRole('link', { name: 'PO-2026-0144' })).toBeInTheDocument();
     expect(screen.getByText('Approved · immutable')).toBeInTheDocument();
   }, 20_000);
+
+  it('renders scientific-notation decimal strings as digits, never as "3E+1"', async () => {
+    await login('ro-exponent@example.test');
+    const plan = await mockApi.getPlan((await mockApi.getPlans())[0].id);
+    // A legacy/buggy server may serialize Decimal('30') as '3E+1'. Where the
+    // screen parses the value, the digits must win: Number('3E+1') === 30.
+    vi.spyOn(api, 'getPlan').mockResolvedValue({
+      ...plan,
+      lines: plan.lines.map((line) =>
+        line.sku === 'SKU-002'
+          ? { ...line, editedBaseUnits: '3E+1', effectiveBaseUnits: '3E+1' }
+          : line,
+      ),
+    });
+    renderReorder();
+
+    await screen.findByRole('table', { name: /Restock plan lines/ });
+    expect(qtyInput('Jasmine rice 1 kg')).toHaveValue(30);
+  });
 });
