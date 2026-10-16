@@ -2,10 +2,17 @@ import { Link, useParams } from 'react-router-dom';
 
 import { PageHead } from '@/components/layout/page-head';
 import { buttonClass, InlineNote } from '@/components/ui';
+import { USE_MOCK } from '@/lib/api';
 import { DEMO_DATE } from '@/lib/mock/fixtures';
 import { usePageTitle } from '@/lib/use-page-title';
 
 import { PlaceholderPage } from './placeholder';
+
+export { LoginPage } from './login';
+export { OnboardingPage } from './onboarding';
+export { RegisterPage } from './register';
+export { SettingsPage } from './settings';
+export { WelcomePage } from './welcome';
 
 export function OverviewPage() {
   return (
@@ -17,7 +24,7 @@ export function OverviewPage() {
       }
       description="Here’s what deserves a look at Maple & Main today."
       docTitle="Overview"
-      eyebrow={DEMO_DATE.label}
+      eyebrow={USE_MOCK ? DEMO_DATE.label : undefined}
       note="Scoped restock suggestions, priority table, freshness, budget and activity — fed by GET /api/inventory/risk and GET /api/plans/{id}."
       owner="Overview workstream"
       title={
@@ -195,38 +202,6 @@ export function ImportResultPage() {
       note={`Committed counts, skipped rows and the resulting data version — fed by POST /api/imports/${importId}/commit. Import success is not a claim about any other system.`}
       owner="Imports workstream"
       title="Your data has a fresh start."
-    />
-  );
-}
-
-export function SettingsPage() {
-  return (
-    <PlaceholderPage
-      description="Preferences, purchasing policy and store details."
-      docTitle="Settings"
-      eyebrow="Settings"
-      note="Grouped preferences with unsaved state and change-impact notes: store identity, region/locale/currency (kept independent), purchasing policy and account. Historical money is never relabeled by preference changes."
-      owner="Settings workstream"
-      title="Make yourself at home."
-    />
-  );
-}
-
-export function WelcomePage() {
-  return (
-    <PlaceholderPage
-      description="Set up your store, then bring in stock and sales."
-      docTitle="Welcome"
-      eyebrow="Get started"
-      note="First-run readiness: a short labeled form and honest recovery, no fake dashboard metrics. Route here for new workspaces before Overview."
-      owner="Onboarding workstream"
-      title={
-        <>
-          Local to you.
-          <br />
-          Ready for anywhere.
-        </>
-      }
     />
   );
 }

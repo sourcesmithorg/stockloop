@@ -477,3 +477,92 @@ class AiExplainResponse(BaseModel):
     planVersion: int | None = None
     productId: str | None = None
     explanations: list[AiExplanation]
+
+
+# --------------------------------------------------------------------------- auth & account
+
+
+class RegisterRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=12, max_length=128)
+    storeName: str = Field(min_length=1, max_length=200)
+    country: str = Field(min_length=2, max_length=2)
+    language: str = Field(min_length=1, max_length=16)
+    currency: str = Field(min_length=3, max_length=3)
+    timezone: str = Field(min_length=1, max_length=64)
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    role: str
+
+
+class StoreOut(ApiModel):
+    id: str
+    name: str
+    countryCode: str
+    locale: str
+    defaultCurrency: str
+    timezone: str
+    version: int
+
+
+class PreferencesOut(ApiModel):
+    locale: str | None = None
+    displayCurrency: str | None = None
+    timezone: str | None = None
+    dateFormat: str | None = None
+    numberFormat: str | None = None
+    version: int
+
+
+class PreferencesUpdate(BaseModel):
+    locale: str | None = None
+    displayCurrency: str | None = None
+    timezone: str | None = None
+    dateFormat: str | None = None
+    numberFormat: str | None = None
+    expectedVersion: int | None = None
+
+
+class PreferencesResult(BaseModel):
+    preferences: PreferencesOut
+    version: int
+
+
+class StoreUpdate(BaseModel):
+    name: str | None = None
+    country: str | None = None
+    locale: str | None = None
+    defaultCurrency: str | None = None
+    timezone: str | None = None
+    expectedVersion: int | None = None
+
+
+class StoreResult(BaseModel):
+    store: StoreOut
+    version: int
+
+
+class StoreWithPreferences(BaseModel):
+    store: StoreOut
+    preferences: PreferencesOut
+
+
+class AuthResult(BaseModel):
+    user: UserOut
+    store: StoreOut
+    preferences: PreferencesOut
+
+
+class MeOut(BaseModel):
+    user: UserOut
+    store: StoreOut
+    preferences: PreferencesOut
+    firstRunComplete: bool

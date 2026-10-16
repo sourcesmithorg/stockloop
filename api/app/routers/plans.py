@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import api_error, get_policy, get_session, get_store, get_today
+from app.deps import api_error, get_policy, get_session, get_store, get_today, require_role
 from app.models import Plan, PlanLine, PurchasingPolicy, Store
 from app.schemas import (
     ApprovalOut,
@@ -63,6 +63,7 @@ async def update_plan_line(
     store: Store = Depends(get_store),
     policy: PurchasingPolicy = Depends(get_policy),
     today: date = Depends(get_today),
+    _role: None = Depends(require_role("operator")),
 ) -> PlanDetailOut:
     plan = await load_plan(session, store, planId)
     line = await _load_line(session, plan, lineId)
@@ -86,6 +87,7 @@ async def approve(
     store: Store = Depends(get_store),
     policy: PurchasingPolicy = Depends(get_policy),
     today: date = Depends(get_today),
+    _role: None = Depends(require_role()),
 ) -> ApprovalOut:
     plan = await load_plan(session, store, planId)
     return await approve_plan(

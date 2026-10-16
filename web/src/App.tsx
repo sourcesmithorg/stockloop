@@ -1,18 +1,22 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { AppShell } from '@/components/layout/app-shell';
+import { useAuth } from '@/lib/auth';
 import {
   ImportMappingPage,
   ImportResultPage,
   ImportValidationPage,
   ImportsPage,
   InventoryPage,
+  LoginPage,
   NotFoundPage,
+  OnboardingPage,
   OrdersPage,
   OrderDetailPage,
   OverviewPage,
   PlanPage,
   ProductPage,
+  RegisterPage,
   ReorderPage,
   SettingsPage,
   SupplierPage,
@@ -21,12 +25,32 @@ import {
 } from '@/pages';
 
 /**
+ * Post-login target: only same-origin absolute paths, never protocol-relative
+ * or external URLs.
+ */
+function safeNext(raw: string | null): string {
+  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/overview';
+}
+
+function LoadingScreen() {
+  return (
+    <div className="grid min-h-screen place-items-center" role="status">
+      <p className="small muted">Loading StockLoop…</p>
+    </div>
+  );
+}
+
+/**
  * Route table. Every route renders exactly one <h1> (PageHead) inside the
  * shell's single <main>; unknown paths get the useful not-found state.
+ * Login/register/onboarding are standalone full-page layouts outside the shell.
  */
-export default function App() {
+function AppRoutes() {
   return (
     <Routes>
+      <Route path="login" element={<LoginPage />} />
+      <Route path="register" element={<RegisterPage />} />
+      <Route path="onboarding" element={<OnboardingPage />} />
       <Route element={<AppShell />}>
         <Route index element={<Navigate replace to="/overview" />} />
         <Route path="overview" element={<OverviewPage />} />
@@ -48,4 +72,36 @@ export default function App() {
       </Route>
     </Routes>
   );
+}
+
+/**
+ * Auth guard around the route table:
+ *  - loading: render a minimal status screen, never redirect;
+ *  - unauthenticated: /login (or /register) only, everything else redirects
+ *    to /login?next=<current path>;
+ *  - authenticated without a completed first run: /onboarding (except while
+ *    already there);
+ *  - authenticated: the app, with /onboarding and /welcome reachable.
+ */
+export default function App() {
+  const { status, firstRunComplete } = useAuth();
+  const location = useLocation();
+  const standalone = location.pathname === '/login' || location.pathname === '/register';
+
+  if (status === 'loading') return <LoadingScreen />;
+
+  if (status === 'authenticated') {
+    if (!firstRunComplete && location.pathname !== '/onboarding') {
+      return <Navigate to="/onboarding" replace />;
+    }
+    if (standalone) {
+      const next = new URLSearchParams(location.search).get('next');
+      return <Navigate to={safeNext(next)} replace />;
+    }
+    return <AppRoutes />;
+  }
+
+  if (standalone) return <AppRoutes />;
+  const next = `${location.pathname}${location.search}`;
+  return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
 }

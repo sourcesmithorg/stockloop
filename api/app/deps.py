@@ -1,17 +1,23 @@
-"""Shared request dependencies and error helpers."""
+"""Shared request dependencies and error helpers.
+
+Authentication boundary: the store is resolved from the signed session cookie
+(via app.services.auth.load_session_user), never from a client-supplied id.
+Operational routers depend on get_store, so they inherit 401/403 enforcement.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
 from app.models import PurchasingPolicy, Store
+from app.services.auth import SessionUser, load_session_user
 
 
 def api_error(code: str, message: str, status_code: int, **extra: Any) -> HTTPException:
@@ -26,35 +32,33 @@ def get_today(request: Request) -> date:
     return request.app.state.today
 
 
+async def get_session_user(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> SessionUser:
+    """Authenticated user from the signed session cookie. 401 when absent/invalid."""
+    settings = get_settings()
+    cookie = request.cookies.get("session")
+    user = await load_session_user(session, cookie, settings.secret_key)
+    if user is None:
+        raise api_error("unauthenticated", "Authentication required", 401)
+    return user
+
+
 async def get_store(
+    user: SessionUser = Depends(get_session_user),
     session: AsyncSession = Depends(get_session),
 ) -> Store:
-    """Trusted store boundary: the store comes from server config, never from the client.
+    """Store bound to the authenticated session user's membership.
 
-    ponytail: no auth system yet; membership verification lands with authentication.
+    The store id is trusted because it is validated against a real membership row
+    (see load_session_user). Client-supplied store ids are never sufficient.
+    Cross-store reads of a foreign record return 404 (handled at each lookup).
     """
-    settings = get_settings()
-    if settings.store_id:
-        store = await session.get(Store, settings.store_id)
-        if store is None:
-            raise api_error("store_not_found", f"Store {settings.store_id} not found", 404)
-        return store
-    stores = list(
-        (
-            await session.execute(select(Store).order_by(Store.created_at, Store.id).limit(2))
-        ).scalars()
-    )
-    if not stores:
-        raise api_error(
-            "store_not_configured", "No store exists yet — run `uv run python -m app.seed`", 503
-        )
-    if len(stores) > 1:
-        raise api_error(
-            "store_ambiguous",
-            "Multiple stores exist — set STOCKLOOP_STORE_ID to pick one",
-            500,
-        )
-    return stores[0]
+    store = await session.get(Store, user.store_id)
+    if store is None:
+        raise api_error("store_not_found", "Store not found", 404)
+    return store
 
 
 async def get_policy(
@@ -67,3 +71,24 @@ async def get_policy(
             "policy_missing", "Purchasing policy missing — run `uv run python -m app.seed`", 503
         )
     return policy
+
+
+def require_role(*allowed: str) -> Callable[..., SessionUser]:
+    """Dependency: raise 403 unless the session user's role is in `allowed`.
+
+    Owner is always admitted (least-privilege callers pass the lowest role).
+    Reads are open to authenticated users of the store (viewer included); use
+    this on mutating endpoints only.
+    """
+
+    def checker(user: SessionUser = Depends(get_session_user)) -> SessionUser:
+        if user.role != "owner" and user.role not in allowed:
+            raise api_error(
+                "forbidden",
+                f"Role '{user.role}' cannot perform this action",
+                403,
+                allowed=list(allowed),
+            )
+        return user
+
+    return checker

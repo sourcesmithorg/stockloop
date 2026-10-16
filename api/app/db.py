@@ -1,9 +1,16 @@
-"""Async SQLAlchemy engine/session wiring."""
+"""Async SQLAlchemy engine/session wiring.
+
+The engine is owned by the app instance and created inside that app's lifespan
+event loop, then disposed on shutdown. This keeps each TestClient (which runs its
+own loop) fully isolated — a module-global engine would be shared across loops
+and asyncpg would raise "attached to a different loop".
+"""
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
+from fastapi import FastAPI, Request
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -13,27 +20,29 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import get_settings
 
-_engine: AsyncEngine | None = None
-_session_factory: async_sessionmaker[AsyncSession] | None = None
+
+def build_engine() -> AsyncEngine:
+    """Create an engine for the current settings (call inside the app's loop)."""
+    return create_async_engine(get_settings().database_url, pool_pre_ping=True)
 
 
-def get_engine() -> AsyncEngine:
-    """Lazily create the engine inside the running event loop (uvicorn/TestClient)."""
-    global _engine
-    if _engine is None:
-        _engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
-    return _engine
+def init_app_state(app: FastAPI) -> None:
+    """Attach a fresh engine + session factory to this app instance."""
+    engine = build_engine()
+    app.state.engine = engine
+    app.state.session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
 
-def get_session_factory() -> async_sessionmaker[AsyncSession]:
-    global _session_factory
-    if _session_factory is None:
-        _session_factory = async_sessionmaker(get_engine(), expire_on_commit=False)
-    return _session_factory
+async def shutdown_app_state(app: FastAPI) -> None:
+    engine: AsyncEngine | None = getattr(app.state, "engine", None)
+    if engine is not None:
+        await engine.dispose()
+        app.state.engine = None
 
 
-async def get_session() -> AsyncIterator[AsyncSession]:
-    session = get_session_factory()()
+async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
+    factory: async_sessionmaker[AsyncSession] = request.app.state.session_factory
+    session = factory()
     try:
         yield session
         await session.commit()
@@ -42,12 +51,3 @@ async def get_session() -> AsyncIterator[AsyncSession]:
         raise
     finally:
         await session.close()
-
-
-async def dispose_engine() -> None:
-    global _engine, _session_factory
-    if _session_factory is not None:
-        _session_factory = None
-    if _engine is not None:
-        await _engine.dispose()
-        _engine = None

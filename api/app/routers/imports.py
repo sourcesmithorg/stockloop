@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import api_error, get_session, get_store
+from app.deps import api_error, get_session, get_store, require_role
 from app.models import Store
 from app.schemas import ImportCommitOut, ImportPreviewOut
 from app.services.imports import REQUIRED_COLUMNS, commit_import, preview_import
@@ -19,6 +19,7 @@ async def preview(
     dataset: str | None = Form(None),
     session: AsyncSession = Depends(get_session),
     store: Store = Depends(get_store),
+    _role: None = Depends(require_role("operator")),
 ) -> ImportPreviewOut:
     if dataset is not None and dataset not in REQUIRED_COLUMNS:
         raise api_error(
@@ -42,5 +43,6 @@ async def commit(
     importId: str,
     session: AsyncSession = Depends(get_session),
     store: Store = Depends(get_store),
+    _role: None = Depends(require_role("operator")),
 ) -> ImportCommitOut:
     return await commit_import(session, store, importId)

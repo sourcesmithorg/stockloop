@@ -1,6 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { render, screen } from '@testing-library/react';
+
+// App is auth-gated; stub an authenticated, first-run-complete session so the
+// existing shell/routing invariants can be asserted without a provider.
+vi.mock('@/lib/auth', () => ({
+  useAuth: () => ({
+    firstRunComplete: true,
+    preferences: null,
+    status: 'authenticated',
+    store: null,
+    user: null,
+  }),
+}));
 import { MemoryRouter } from 'react-router-dom';
 
 import App from '@/App';

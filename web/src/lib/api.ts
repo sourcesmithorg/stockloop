@@ -1,8 +1,9 @@
 import { mockApi } from '@/lib/mock';
 
-import { ApiError } from './errors';
+import { ApiError, type ApiErrorDetail } from './errors';
 
 export { ApiError, isNotFound } from './errors';
+export type { ApiErrorDetail } from './errors';
 
 /**
  * StockLoop API contract — mirrors the FastAPI backend on http://localhost:8000
@@ -327,6 +328,95 @@ export interface HealthResponse {
   version: string;
 }
 
+// ---- Auth, store & preferences -------------------------------------------
+
+export interface User {
+  id: string;
+  email: string;
+  role: string;
+}
+
+export interface Store {
+  id: string;
+  name: string;
+  countryCode: string;
+  locale: string;
+  defaultCurrency: string;
+  timezone: string;
+  version: number;
+}
+
+export interface Preferences {
+  locale: string;
+  displayCurrency: string;
+  timezone: string;
+  dateFormat: string;
+  numberFormat: string;
+  version: number;
+}
+
+/** GET /api/auth/me — the session snapshot the guard renders from. */
+export interface MeOut {
+  user: User;
+  store: Store;
+  preferences: Preferences;
+  firstRunComplete: boolean;
+}
+
+export interface AuthResult {
+  user: User;
+  store: Store;
+  preferences: Preferences;
+}
+
+export interface StoreWithPreferences {
+  store: Store;
+  preferences: Preferences;
+}
+
+export interface StoreResult {
+  store: Store;
+  version: number;
+}
+
+export interface PreferencesResult {
+  preferences: Preferences;
+  version: number;
+}
+
+export interface AuthCredentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterInput {
+  email: string;
+  password: string;
+  storeName: string;
+  country: string;
+  language: string;
+  currency: string;
+  timezone: string;
+}
+
+export interface StoreUpdateInput {
+  name?: string;
+  country?: string;
+  locale?: string;
+  defaultCurrency?: string;
+  timezone?: string;
+  expectedVersion: number;
+}
+
+export interface PreferencesUpdateInput {
+  locale?: string;
+  displayCurrency?: string;
+  timezone?: string;
+  dateFormat?: string;
+  numberFormat?: string;
+  expectedVersion: number;
+}
+
 // ---- Client contract ------------------------------------------------------
 
 export interface ApiClient {
@@ -344,18 +434,41 @@ export interface ApiClient {
   previewImport(input: PreviewImportInput): Promise<ImportPreview>;
   commitImport(importId: string, input: CommitImportInput): Promise<ImportResult>;
   explain(input: ExplainInput): Promise<ExplainResponse>;
+  login(input: AuthCredentials): Promise<AuthResult>;
+  register(input: RegisterInput): Promise<AuthResult>;
+  logout(): Promise<void>;
+  me(): Promise<MeOut>;
+  getStore(): Promise<StoreWithPreferences>;
+  updateStore(input: StoreUpdateInput): Promise<StoreResult>;
+  updatePreferences(input: PreferencesUpdateInput): Promise<PreferencesResult>;
 }
 
 // ---- HTTP implementation --------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...init,
   });
   if (!response.ok) {
-    throw new ApiError(response.status, `${response.status} ${response.statusText} on ${path}`);
+    // Errors follow the {detail: {code, message, field?, currentVersion?}}
+    // envelope; a non-JSON body (proxy/HTML) falls back to the status line.
+    let detail: ApiErrorDetail | undefined;
+    try {
+      const body = (await response.json()) as { detail?: ApiErrorDetail };
+      detail = body.detail;
+    } catch {
+      // No JSON body to parse — keep the generic status message.
+    }
+    throw new ApiError(
+      response.status,
+      detail?.message ?? `${response.status} ${response.statusText} on ${path}`,
+      detail,
+    );
   }
+  // 204 No Content (e.g. logout) has no body to parse.
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
@@ -382,6 +495,13 @@ export const httpApi: ApiClient = {
   commitImport: (importId, input) =>
     request(`/imports/${encodeURIComponent(importId)}/commit`, post(input)),
   explain: (input) => request('/ai/explain', post(input)),
+  login: (input) => request('/auth/login', post(input)),
+  register: (input) => request('/auth/register', post(input)),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  me: () => request('/auth/me'),
+  getStore: () => request('/store'),
+  updateStore: (input) => request('/store', post(input)),
+  updatePreferences: (input) => request('/preferences', post(input)),
 };
 
 /** Single mock/real toggle. Default: fixtures. VITE_USE_MOCK=false → real API. */

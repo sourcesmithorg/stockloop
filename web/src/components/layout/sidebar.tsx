@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 
+import { USE_MOCK } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { STORE } from '@/lib/mock/fixtures';
 
 import { Icon } from './icon';
@@ -8,20 +10,35 @@ import { PRIMARY_NAV, SECONDARY_NAV } from './nav';
 
 /** Desktop task sidebar — 224px, quiet, fixed (template `.sidebar`). */
 export function Sidebar() {
+  const { user, store } = useAuth();
+
+  // Real session state when authenticated; fixtures only in USE_MOCK demo builds.
+  const workspaceName = store?.name ?? (USE_MOCK ? STORE.name : null);
+  const workspaceKind = USE_MOCK ? STORE.kind : null;
+  const profileName = user?.email ?? (USE_MOCK ? STORE.owner.name : null);
+  const profileInitials = user
+    ? user.email.split('@')[0].slice(0, 2).toUpperCase()
+    : USE_MOCK
+      ? STORE.owner.initials
+      : null;
+  const profileRole = user?.role ?? (USE_MOCK ? STORE.owner.role : null);
+
   return (
     <aside aria-label="Main navigation" className="sidebar" data-component="app-sidebar">
       <Link aria-label="StockLoop overview" className="brand" to="/overview">
         <img alt="" height={33} src="/loop.svg" width={33} />
         stockloop
       </Link>
-      <Link className="workspace-button" to="/settings#store">
-        <span className="workspace-initial">{STORE.name.charAt(0)}</span>
-        <span>
-          <strong>{STORE.name}</strong>
-          <small>{STORE.kind}</small>
-        </span>
-        <Icon name="i-chevron" />
-      </Link>
+      {workspaceName && (
+        <Link className="workspace-button" to="/settings#store">
+          <span className="workspace-initial">{workspaceName.charAt(0)}</span>
+          <span>
+            <strong>{workspaceName}</strong>
+            {workspaceKind && <small>{workspaceKind}</small>}
+          </span>
+          <Icon name="i-chevron" />
+        </Link>
+      )}
 
       <NavLinks items={PRIMARY_NAV} />
 
@@ -36,13 +53,18 @@ export function Sidebar() {
             <span>{item.label}</span>
           </Link>
         ))}
-        <Link className="sidebar-profile" to="/settings#account">
-          <span className="avatar">{STORE.owner.initials}</span>
-          <span>
-            <strong>{STORE.owner.name}</strong>
-            <small>{STORE.owner.role} · Demo account</small>
-          </span>
-        </Link>
+        {profileName && profileInitials && (
+          <Link className="sidebar-profile" to="/settings#account">
+            <span className="avatar">{profileInitials}</span>
+            <span>
+              <strong>{profileName}</strong>
+              <small>
+                {profileRole}
+                {profileRole && USE_MOCK ? ' · Demo account' : ''}
+              </small>
+            </span>
+          </Link>
+        )}
       </div>
     </aside>
   );

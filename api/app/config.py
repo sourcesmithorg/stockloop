@@ -35,8 +35,9 @@ class Settings:
     # Fixture/demo anchor: when set, the API interprets "today" as this date so the
     # delivered Oct-2026 fixture arithmetic stays reproducible on any machine clock.
     today_override: date | None
-
     gemini_api_key: str | None
+    secret_key: str
+    environment: str
 
 
 def get_settings() -> Settings:
@@ -58,4 +59,6 @@ def get_settings() -> Settings:
         gemini_api_key=api_key,
         store_id=os.environ.get("STOCKLOOP_STORE_ID") or None,
         today_override=date.fromisoformat(today_raw) if today_raw else None,
+        secret_key=os.environ.get("SECRET_KEY") or "change-me-locally",
+        environment=os.environ.get("ENVIRONMENT") or "development",
     )

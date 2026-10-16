@@ -75,6 +75,55 @@ class StoreBudget(Base):
     amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
 
 
+class User(Base):
+    __tablename__ = "user"  # reserved word — SQLAlchemy quotes the identifier.
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    email: Mapped[str] = mapped_column(String(254), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class Membership(Base):
+    __tablename__ = "membership"
+    __table_args__ = (UniqueConstraint("store_id", "user_id", name="uq_membership_store_user"),)
+
+    store_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("store.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(String(24), nullable=False, default="viewer")
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active")
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class Preference(Base):
+    __tablename__ = "preference"
+
+    store_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("store.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
+    )
+    locale: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    display_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    date_format: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    number_format: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Product(Base):
     __tablename__ = "product"
     __table_args__ = (UniqueConstraint("store_id", "sku", name="uq_product_store_sku"),)

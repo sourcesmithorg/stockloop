@@ -23,7 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import get_settings
 from app.models import (
     Approval,
+    Membership,
     Plan,
+    Preference,
     Product,
     ProductSupplierTerms,
     PurchasingPolicy,
@@ -32,7 +34,9 @@ from app.models import (
     Store,
     StoreBudget,
     Supplier,
+    User,
 )
+from app.services.auth import hash_password
 from app.services.plans import approve_plan, build_plan
 
 FIXTURE_TODAY = date(2026, 10, 13)
@@ -47,6 +51,10 @@ def _id(kind: str, key: str) -> str:
 
 STORE_ID = _id("store", "maple-main")
 POLICY_VERSION = "2026-10-13.v1"
+FIXTURE_USER_ID = _id("user", "fixture-owner")
+FIXTURE_OWNER_EMAIL = "owner@stockloop.test"
+# Demo fixture account (not a real credential); hashed, never plaintext.
+FIXTURE_OWNER_PASSWORD = "Stockloop123!"
 
 SUPPLIERS: list[dict[str, Any]] = [
     {
@@ -164,6 +172,32 @@ async def seed(session: AsyncSession) -> dict[str, object]:
     if await session.get(StoreBudget, (STORE_ID, "USD")) is None:
         session.add(StoreBudget(store_id=STORE_ID, currency="USD", amount=Decimal("500.00")))
         created["budget"] = 1
+    # Demo fixture owner (owner@stockloop.test) — created idempotently so the
+    # test client can authenticate against the seeded store. Hashed password.
+    owner = await session.get(User, FIXTURE_USER_ID)
+    if owner is None:
+        owner = User(
+            id=FIXTURE_USER_ID,
+            email=FIXTURE_OWNER_EMAIL,
+            password_hash=hash_password(FIXTURE_OWNER_PASSWORD),
+            created_at=datetime.now(UTC),
+        )
+        session.add(owner)
+        created["owner"] = 1
+    if await session.get(Membership, (STORE_ID, FIXTURE_USER_ID)) is None:
+        session.add(
+            Membership(
+                store_id=STORE_ID,
+                user_id=FIXTURE_USER_ID,
+                role="owner",
+                status="active",
+                version=1,
+            )
+        )
+        created["membership"] = 1
+    if await session.get(Preference, (STORE_ID, FIXTURE_USER_ID)) is None:
+        session.add(Preference(store_id=STORE_ID, user_id=FIXTURE_USER_ID, version=1))
+        created["preference"] = 1
 
     supplier_ids: dict[str, str] = {}
     for row in SUPPLIERS:

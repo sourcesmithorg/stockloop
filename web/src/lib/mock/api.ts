@@ -15,6 +15,16 @@ import {
   fixtureImportPreview,
 } from './fixtures';
 
+import {
+  mockGetStore,
+  mockLogin,
+  mockLogout,
+  mockMe,
+  mockRegister,
+  mockUpdatePreferences,
+  mockUpdateStore,
+} from './auth';
+
 /**
  * Fixture API — implements the same ApiClient contract as the real /api backend
  * so screens developed against `api` from '@/lib/api' switch with one env flag.
@@ -226,4 +236,12 @@ export const mockApi: ApiClient = {
         'No AI provider is configured in the scaffold — deterministic explanation shown.',
     };
   },
+
+  login: mockLogin,
+  register: mockRegister,
+  logout: mockLogout,
+  me: mockMe,
+  getStore: () => Promise.resolve(mockGetStore()),
+  updateStore: mockUpdateStore,
+  updatePreferences: mockUpdatePreferences,
 };
