@@ -92,3 +92,53 @@ describe('purchase orders (live data)', () => {
     await waitFor(() => expect(screen.getByText('PO-2026-0142')).toBeInTheDocument());
   });
 });
+
+describe('order export (attempt capture, honest states)', () => {
+  it('produces a document on success and never claims supplier contact', async () => {
+    await seedOwner('po-export@example.test');
+    vi.spyOn(api, 'exportOrder').mockResolvedValue({
+      id: 'EXP-0001',
+      orderId: 'PO-0142',
+      displayNumber: 'PO-2026-0142',
+      status: 'succeeded',
+      failureCode: null,
+      failureMessage: null,
+      documentDigest: 'sha256-PO-0142-v1',
+      documentUrl: '/api/orders/PO-0142/document',
+      approvalId: 'APPROVAL-001',
+      planId: 'PLAN-001',
+      planVersion: 1,
+      currency: 'USD',
+      attemptedAt: '2026-10-13T09:05:00Z',
+      disclaimer: 'Document ready — it was produced locally; no supplier was contacted.',
+    });
+    renderOrders();
+    await screen.findByRole('table', { name: /Purchase-order history/ });
+    const row = rowFor('PO-2026-0142');
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Export' }));
+
+    expect(await within(row).findByText('Document ready')).toBeInTheDocument();
+    expect(within(row).getByText(/no supplier was contacted/)).toBeInTheDocument();
+    // Success copy must never imply the supplier received or accepted anything.
+    expect(within(row).queryByText(/supplier accepted/i)).toBeNull();
+    expect(within(row).queryByText(/was sent/i)).toBeNull();
+  });
+
+  it('surfaces a refusal with the reason preserved and retries without losing context', async () => {
+    await seedOwner('po-stale@example.test');
+    const spy = vi
+      .spyOn(api, 'exportOrder')
+      .mockRejectedValueOnce(new ApiError(409, 'This plan was edited after approval.'));
+    renderOrders();
+    await screen.findByRole('table', { name: /Purchase-order history/ });
+    const row = rowFor('PO-2026-0142');
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Export' }));
+
+    expect(await within(row).findByText(/This plan was edited after approval/)).toBeInTheDocument();
+    // A retry re-invokes export rather than clearing the failure.
+    await userEvent.click(within(row).getByRole('button', { name: 'Retry' }));
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+});

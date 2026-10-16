@@ -1,5 +1,6 @@
 import type {
   ApiClient,
+  ExportAttempt,
   ImportPreview,
   PlanDetail,
   PreviewImportInput,
@@ -18,13 +19,17 @@ import {
 } from './fixtures';
 
 import {
+  mockAddStoreMember,
   mockGetStore,
+  mockGetStoreMembers,
   mockLogin,
   mockLogout,
   mockMe,
   mockRegister,
+  mockRevokeStoreMember,
   mockUpdatePreferences,
   mockUpdateStore,
+  mockUpdateStoreMemberRole,
 } from './auth';
 
 /**
@@ -46,6 +51,9 @@ const planOrder = [DRAFT_PLAN.id, APPROVED_PLAN.id]; // newest first
 
 const importPreviews = new Map<string, ImportPreview>();
 let importCounter = 0;
+// Recorded export attempts per order id — mirrors the backend audit trail.
+const exportAttempts = new Map<string, ExportAttempt[]>();
+let exportCounter = 0;
 let storeVersionCounter = 6;
 let documentCounter = 143;
 
@@ -281,6 +289,60 @@ export const mockApi: ApiClient = {
     return structuredClone(order);
   },
 
+  // Mirrors POST /orders/:id/export — same guards (approved + active only),
+  // records the attempt, and reuses the digest so a retry is one document.
+  async exportOrder(id) {
+    // The contract allows an actorId, but ExportAttempt carries no actor, so
+    // the mock ignores it — attempts are recorded under the order alone.
+    const order = ORDER_DETAILS.find((candidate) => candidate.id === id);
+    if (!order) notFound('Purchase order', id);
+    const attempts = exportAttempts.get(id) ?? [];
+    exportCounter += 1;
+    const base = {
+      id: `EXP-${String(exportCounter).padStart(4, '0')}`,
+      orderId: id,
+      displayNumber: order.displayNumber,
+      documentUrl: `/api/orders/${id}/document`,
+      approvalId: order.approvalId,
+      planId: order.planId,
+      planVersion: order.planVersion ?? 1,
+      currency: order.currency,
+      attemptedAt: new Date().toISOString(),
+    };
+
+    const stale = order.documentStatus !== 'approved' || order.approvalStatus !== 'active';
+    const attempt: ExportAttempt = stale
+      ? {
+          ...base,
+          status: 'failed',
+          failureCode: order.approvalStatus === 'stale' ? 'stale_export' : 'order_not_exportable',
+          failureMessage:
+            'This document is no longer the approved current version. Re-approve the plan to export.',
+          documentDigest: null,
+          disclaimer:
+            'Export refused — no document was produced and nothing was sent to the supplier.',
+        }
+      : {
+          ...base,
+          status: 'succeeded',
+          failureCode: null,
+          failureMessage: null,
+          documentDigest: `sha256-${id}-v${order.planVersion ?? 1}`,
+          disclaimer:
+            'Document ready — it was produced locally; no supplier was contacted and nothing was sent.',
+        };
+
+    attempts.unshift(attempt);
+    exportAttempts.set(id, attempts);
+    return structuredClone(attempt);
+  },
+
+  async getOrderExports(id) {
+    const order = ORDER_DETAILS.find((candidate) => candidate.id === id);
+    if (!order) notFound('Purchase order', id);
+    return structuredClone(exportAttempts.get(id) ?? []);
+  },
+
   async previewImport({ file, dataset }) {
     importCounter += 1;
     const importId = `IMP-${String(importCounter).padStart(4, '0')}`;
@@ -439,4 +501,8 @@ export const mockApi: ApiClient = {
   getStore: () => Promise.resolve(mockGetStore()),
   updateStore: mockUpdateStore,
   updatePreferences: mockUpdatePreferences,
+  getStoreMembers: mockGetStoreMembers,
+  addStoreMember: mockAddStoreMember,
+  updateStoreMemberRole: mockUpdateStoreMemberRole,
+  revokeStoreMember: mockRevokeStoreMember,
 };

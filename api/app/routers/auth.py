@@ -130,9 +130,12 @@ async def login(
     membership = (
         (
             await session.execute(
-                select(Membership).where(
-                    Membership.user_id == user.id, Membership.status == "active"
-                )
+                select(Membership)
+                .where(Membership.user_id == user.id, Membership.status == "active")
+                # Newest active membership first: a user invited into another
+                # store lands in that store on next login; single-membership
+                # users are unaffected. Deterministic, never arbitrary.
+                .order_by(Membership.created_at.desc())
             )
         )
         .scalars()

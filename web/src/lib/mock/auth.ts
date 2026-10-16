@@ -1,13 +1,17 @@
 import type {
+  AddMemberInput,
   AuthCredentials,
   AuthResult,
+  MemberResult,
   MeOut,
   Preferences,
   PreferencesResult,
   PreferencesUpdateInput,
   RegisterInput,
   Store,
+  StoreMember,
   StoreResult,
+  StoreRole,
   StoreUpdateInput,
   StoreWithPreferences,
   User,
@@ -213,4 +217,122 @@ export async function mockUpdatePreferences(
   if (input.numberFormat !== undefined) preferences.numberFormat = input.numberFormat;
   account.preferences = preferences;
   return { preferences, version: preferences.version };
+}
+
+// ---- Store members (GET/POST/PATCH/DELETE /store/members) ------------------
+
+const membersByStore = new Map<string, StoreMember[]>();
+
+/** The session user's row is seeded lazily; the backend owns real scoping. */
+function storeMembers(account: MockAccount): StoreMember[] {
+  let members = membersByStore.get(account.store.id);
+  if (!members) {
+    members = [
+      {
+        id: account.user.id,
+        email: account.user.email,
+        role: account.user.role as StoreRole,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    membersByStore.set(account.store.id, members);
+  }
+  return members;
+}
+
+function requireOwner(account: MockAccount): void {
+  if (account.user.role !== 'owner') {
+    throw new ApiError(403, 'Only the store owner can manage members.', { code: 'forbidden' });
+  }
+}
+
+function activeOwnerCount(members: StoreMember[]): number {
+  return members.filter((member) => member.role === 'owner' && member.status === 'active').length;
+}
+
+const noEmailSent = (email: string): string =>
+  `Membership recorded for ${email}. No email was sent — nobody was contacted; tell them yourself.`;
+
+export async function mockGetStoreMembers(): Promise<StoreMember[]> {
+  await settle();
+  const account = requireSession();
+  return storeMembers(account).map((member) => ({ ...member }));
+}
+
+export async function mockAddStoreMember(input: AddMemberInput): Promise<MemberResult> {
+  await settle();
+  const account = requireSession();
+  requireOwner(account);
+  if (input.role !== 'owner' && input.role !== 'operator' && input.role !== 'viewer') {
+    throw new ApiError(400, `Unknown role: ${input.role}`, { code: 'invalid_role', field: 'role' });
+  }
+  const members = storeMembers(account);
+  const email = input.email.trim().toLowerCase();
+  if (members.some((member) => member.email === email && member.status === 'active')) {
+    throw new ApiError(409, 'This email is already an active member of the store.', {
+      code: 'already_member',
+      field: 'email',
+    });
+  }
+  const target = accounts.get(email);
+  if (!target) {
+    throw new ApiError(404, 'No account exists for that email — they must register first.', {
+      code: 'user_not_found',
+      field: 'email',
+    });
+  }
+  const member: StoreMember = {
+    id: target.user.id,
+    email: target.user.email,
+    role: input.role,
+    status: 'active',
+    createdAt: new Date().toISOString(),
+  };
+  // Re-inviting a revoked member reactivates their row instead of duplicating it.
+  const index = members.findIndex((row) => row.id === member.id);
+  if (index >= 0) members[index] = member;
+  else members.push(member);
+  return { member: { ...member }, notified: false, message: noEmailSent(email) };
+}
+
+export async function mockUpdateStoreMemberRole(
+  userId: string,
+  role: StoreRole,
+): Promise<StoreMember> {
+  await settle();
+  const account = requireSession();
+  requireOwner(account);
+  if (role !== 'owner' && role !== 'operator' && role !== 'viewer') {
+    throw new ApiError(400, `Unknown role: ${role}`, { code: 'invalid_role', field: 'role' });
+  }
+  const members = storeMembers(account);
+  const member = members.find((row) => row.id === userId && row.status === 'active');
+  if (!member) {
+    throw new ApiError(404, 'That person is not an active member of the store.', {
+      code: 'member_not_found',
+    });
+  }
+  if (member.role === 'owner' && role !== 'owner' && activeOwnerCount(members) === 1) {
+    throw new ApiError(409, 'The store needs at least one active owner.', { code: 'last_owner' });
+  }
+  member.role = role;
+  return { ...member };
+}
+
+export async function mockRevokeStoreMember(userId: string): Promise<void> {
+  await settle();
+  const account = requireSession();
+  requireOwner(account);
+  const members = storeMembers(account);
+  const member = members.find((row) => row.id === userId && row.status === 'active');
+  if (!member) {
+    throw new ApiError(404, 'That person is not an active member of the store.', {
+      code: 'member_not_found',
+    });
+  }
+  if (member.role === 'owner' && activeOwnerCount(members) === 1) {
+    throw new ApiError(409, 'The store needs at least one active owner.', { code: 'last_owner' });
+  }
+  member.status = 'revoked';
 }

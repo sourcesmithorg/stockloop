@@ -387,6 +387,29 @@ export interface OrderDetail extends OrderSummary {
   disclaimer: string;
 }
 
+/**
+ * One recorded export attempt. `status` is only ever `succeeded` (document
+ * produced) or `failed` (refused). There is no sent/accepted/delivered state —
+ * an export produces a file and nothing more. `documentDigest` (sha256) is set
+ * only on success, so identical retries share one document identity.
+ */
+export interface ExportAttempt {
+  id: string;
+  orderId: string;
+  displayNumber: string;
+  status: 'succeeded' | 'failed';
+  failureCode: string | null;
+  failureMessage: string | null;
+  documentDigest: string | null;
+  documentUrl: string;
+  approvalId: string;
+  planId: string;
+  planVersion: number;
+  currency: string;
+  attemptedAt: string;
+  disclaimer: string;
+}
+
 // ---- Imports ---------------------------------------------------------------
 
 /** Backend datasets (app/services/imports.py REQUIRED_COLUMNS). */
@@ -569,6 +592,28 @@ export interface PreferencesUpdateInput {
   expectedVersion: number;
 }
 
+export type StoreRole = 'owner' | 'operator' | 'viewer';
+
+export interface StoreMember {
+  id: string; // user id
+  email: string;
+  role: StoreRole;
+  status: 'active' | 'revoked';
+  createdAt: string; // ISO datetime
+}
+
+export interface AddMemberInput {
+  email: string;
+  role: StoreRole;
+}
+
+/** Adding a member records membership only — no email is ever sent. */
+export interface MemberResult {
+  member: StoreMember;
+  notified: false;
+  message: string;
+}
+
 // ---- Client contract -------------------------------------------------------
 
 export interface ApiClient {
@@ -584,6 +629,8 @@ export interface ApiClient {
   approvePlan(planId: string, input: ApprovePlanInput): Promise<Approval>;
   getOrders(): Promise<OrderSummary[]>;
   getOrder(id: string): Promise<OrderDetail>;
+  exportOrder(id: string, actorId?: string): Promise<ExportAttempt>;
+  getOrderExports(id: string): Promise<ExportAttempt[]>;
   previewImport(input: PreviewImportInput): Promise<ImportPreview>;
   commitImport(importId: string): Promise<ImportResult>;
   explain(input: ExplainInput): Promise<AiExplainResponse>;
@@ -594,6 +641,10 @@ export interface ApiClient {
   getStore(): Promise<StoreWithPreferences>;
   updateStore(input: StoreUpdateInput): Promise<StoreResult>;
   updatePreferences(input: PreferencesUpdateInput): Promise<PreferencesResult>;
+  getStoreMembers(): Promise<StoreMember[]>;
+  addStoreMember(input: AddMemberInput): Promise<MemberResult>;
+  updateStoreMemberRole(userId: string, role: StoreRole): Promise<StoreMember>;
+  revokeStoreMember(userId: string): Promise<void>;
 }
 
 // ---- HTTP implementation --------------------------------------------------
@@ -658,6 +709,9 @@ export const httpApi: ApiClient = {
     request(`/plans/${encodeURIComponent(planId)}/approve`, post(input)),
   getOrders: () => request('/orders'),
   getOrder: (id) => request(`/orders/${encodeURIComponent(id)}`),
+  exportOrder: (id, actorId) =>
+    request(`/orders/${encodeURIComponent(id)}/export`, post({ actorId: actorId ?? 'owner' })),
+  getOrderExports: (id) => request(`/orders/${encodeURIComponent(id)}/exports`),
   previewImport: ({ file, dataset }) => {
     const body = new FormData();
     body.append('dataset', dataset);
@@ -674,6 +728,15 @@ export const httpApi: ApiClient = {
   getStore: () => request('/store'),
   updateStore: (input) => request('/store', post(input)),
   updatePreferences: (input) => request('/preferences', post(input)),
+  getStoreMembers: () => request('/store/members'),
+  addStoreMember: (input) => request('/store/members', post(input)),
+  updateStoreMemberRole: (userId, role) =>
+    request(`/store/members/${encodeURIComponent(userId)}`, {
+      ...post({ role }),
+      method: 'PATCH',
+    }),
+  revokeStoreMember: (userId) =>
+    request(`/store/members/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
 };
 
 /** Single mock/real toggle. Default: fixtures. VITE_USE_MOCK=false → real API. */

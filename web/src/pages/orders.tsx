@@ -11,7 +11,7 @@ import {
   Table,
 } from '@/components/ui';
 import { StatusPill, type PillTone } from '@/components/ui/status-pill';
-import { api, type OrderSummary } from '@/lib/api';
+import { api, type ExportAttempt, type OrderSummary } from '@/lib/api';
 import { formatMoneyWithCode } from '@/lib/money';
 import { formatDate } from '@/lib/risk-display';
 import { useApi } from '@/lib/use-api';
@@ -133,6 +133,7 @@ export function OrdersPage() {
                     Total
                   </th>
                   <th scope="col">Status</th>
+                  <th scope="col">Export</th>
                   <th scope="col">Action</th>
                 </tr>
               </thead>
@@ -187,11 +188,73 @@ function OrderRow({ order }: { order: OrderSummary }) {
         <StatusPill label={status.label} tone={status.tone} />
         <span className="sub">Approval: {order.approvalStatus ?? 'none on record'}</span>
       </td>
+      <ExportCell order={order} />
       <td>
         <Link className="btn small-btn" to={`/orders/${order.id}`}>
           Open document
         </Link>
       </td>
     </tr>
+  );
+}
+
+/**
+ * Export action for one order. Captures attempt/result honestly: success means
+ * the document was produced (never that a supplier received or accepted it);
+ * a stale or superseded document is refused with the reason preserved and a
+ * retry that keeps context.
+ */
+function ExportCell({ order }: { order: OrderSummary }) {
+  const [phase, setPhase] = useState<'idle' | 'working'>('idle');
+  const [result, setResult] = useState<ExportAttempt | null>(null);
+  const [error, setError] = useState<unknown>(null);
+
+  const canExport = order.documentStatus === 'approved' && order.approvalStatus === 'active';
+
+  async function run() {
+    setPhase('working');
+    setError(null);
+    try {
+      setResult(await api.exportOrder(order.id));
+    } catch (caught) {
+      setResult(null);
+      setError(caught);
+    } finally {
+      setPhase('idle');
+    }
+  }
+
+  return (
+    <td>
+      <button
+        className={buttonClass('secondary', 'sm')}
+        disabled={phase === 'working'}
+        onClick={() => void run()}
+        type="button"
+      >
+        {phase === 'working' ? 'Exporting…' : 'Export'}
+      </button>
+      {result?.status === 'succeeded' && (
+        <span className="sub">
+          <a className="link-dark" href={result.documentUrl}>
+            Document ready
+          </a>{' '}
+          — produced locally; no supplier was contacted.
+        </span>
+      )}
+      {error != null && (
+        <span className="sub">
+          {error instanceof Error ? error.message : 'Export failed.'}{' '}
+          <button className="link-dark" onClick={() => void run()} type="button">
+            Retry
+          </button>
+        </span>
+      )}
+      {!canExport && !error && (
+        <span className="sub">
+          Not exportable — {order.documentStatus}, approval {order.approvalStatus ?? 'missing'}.
+        </span>
+      )}
+    </td>
   );
 }

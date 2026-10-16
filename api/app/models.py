@@ -397,3 +397,35 @@ class PurchaseOrder(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class ExportAttempt(Base):
+    """One honest record per export attempt: the document was produced (or
+    refused), nothing more. There is no sent/accepted state — StockLoop never
+    contacts a supplier.
+    """
+
+    __tablename__ = "export_attempt"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    store_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("store.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    order_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("purchase_order.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Provenance captured at attempt time (plain strings: the audit trail
+    # survives later supersession of the approval/plan rows themselves).
+    approval_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    plan_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    plan_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    # succeeded: document produced; failed: refused (stale/superseded/...).
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    failure_code: Mapped[str | None] = mapped_column(String(48))
+    failure_message: Mapped[str | None] = mapped_column(Text)
+    # sha256 of the produced HTML: identical retries share one document identity.
+    document_digest: Mapped[str | None] = mapped_column(String(64))
+    actor_id: Mapped[str] = mapped_column(String(80), nullable=False, default="owner")
+    attempted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

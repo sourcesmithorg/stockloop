@@ -2,10 +2,28 @@ import { useState } from 'react';
 
 import { PageHead } from '@/components/layout/page-head';
 import { Icon } from '@/components/layout/icon';
-import { Button, Field, InlineNote, Select } from '@/components/ui';
-import { ApiError, type Preferences, type Store } from '@/lib/api';
+import {
+  Button,
+  EmptyState,
+  ErrorNote,
+  Field,
+  InlineNote,
+  Input,
+  Select,
+  Table,
+} from '@/components/ui';
+import { StatusPill } from '@/components/ui/status-pill';
+import {
+  api,
+  ApiError,
+  type Preferences,
+  type Store,
+  type StoreMember,
+  type StoreRole,
+} from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { COUNTRIES, CURRENCIES, LANGUAGES, TIMEZONES } from '@/lib/region-data';
+import { useApi } from '@/lib/use-api';
 import { usePageTitle } from '@/lib/use-page-title';
 
 /** Regional settings — .template/settings.html (#region). Country and display
@@ -21,7 +39,10 @@ export function SettingsPage() {
         title="Make yourself at home."
       />
       {store && preferences ? (
-        <RegionForm initialPreferences={preferences} initialStore={store} />
+        <div className="settings-grid">
+          <RegionForm initialPreferences={preferences} initialStore={store} />
+          <MembersSection />
+        </div>
       ) : (
         <p className="small muted">Loading settings…</p>
       )}
@@ -129,84 +150,324 @@ function RegionForm({
               : 'No unsaved changes.';
 
   return (
-    <div className="settings-grid">
-      <section className="panel panel-pad settings-section" id="region">
-        <h2>Your region. Your terms.</h2>
-        <p className="muted">
-          Country and currency are independent preferences. English and USD are the defaults.
-        </p>
-        <div className="field-grid two">
-          <Field
-            help="ISO country choices. No currency is inferred or converted."
-            label="Store country"
-          >
-            <Select onChange={(event) => touch(setCountry, event.target.value)} value={country}>
-              {COUNTRIES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field
-            help="The screens remain English until translations exist."
-            label="Interface language"
-          >
-            <Select onChange={(event) => touch(setLanguage, event.target.value)} value={language}>
-              {LANGUAGES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field
-            help="Amounts display in this currency after integration."
-            label="Display currency"
-          >
-            <Select onChange={(event) => touch(setCurrency, event.target.value)} value={currency}>
-              {CURRENCIES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field help="Used for sales windows and delivery-date cutoffs." label="Store timezone">
-            <Select onChange={(event) => touch(setTimezone, event.target.value)} value={timezone}>
-              {TIMEZONES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
+    <section className="panel panel-pad settings-section" id="region">
+      <h2>Your region. Your terms.</h2>
+      <p className="muted">
+        Country and currency are independent preferences. English and USD are the defaults.
+      </p>
+      <div className="field-grid two">
+        <Field
+          help="ISO country choices. No currency is inferred or converted."
+          label="Store country"
+        >
+          <Select onChange={(event) => touch(setCountry, event.target.value)} value={country}>
+            {COUNTRIES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field
+          help="The screens remain English until translations exist."
+          label="Interface language"
+        >
+          <Select onChange={(event) => touch(setLanguage, event.target.value)} value={language}>
+            {LANGUAGES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field help="Amounts display in this currency after integration." label="Display currency">
+          <Select onChange={(event) => touch(setCurrency, event.target.value)} value={currency}>
+            {CURRENCIES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field help="Used for sales windows and delivery-date cutoffs." label="Store timezone">
+          <Select onChange={(event) => touch(setTimezone, event.target.value)} value={timezone}>
+            {TIMEZONES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+      <div className="mt-24">
+        <InlineNote tone="warn" title="Changing currency is not currency conversion.">
+          Keep historic orders in their original currency. Resolve supplier-currency mismatches
+          before approval; do not re-label previous amounts.
+        </InlineNote>
+      </div>
+      <div className="form-actions">
+        <span aria-live="polite" className="small muted" role="status">
+          {statusText}
+        </span>
+        <Button
+          disabled={!dirty}
+          loading={save.phase === 'saving'}
+          loadingLabel="Saving…"
+          onClick={() => {
+            void handleSave();
+          }}
+          type="button"
+          variant="primary"
+        >
+          <Icon name="i-check" />
+          {save.phase === 'error' || save.phase === 'conflict' ? 'Retry save' : 'Save changes'}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+const ROLE_OPTIONS: StoreRole[] = ['owner', 'operator', 'viewer'];
+
+/** Store membership — GET/POST/PATCH/DELETE /api/store/members. Owners
+ * manage; everyone on the team sees who has access. No email is sent on add. */
+function MembersSection() {
+  const { user } = useAuth();
+  const members = useApi(() => api.getStoreMembers(), []);
+  const canManage = user?.role === 'owner';
+
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<StoreRole>('operator');
+  const [adding, setAdding] = useState(false);
+  const [notice, setNotice] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
+
+  const rows = members.data ?? [];
+
+  function messageOf(caught: unknown, fallback: string): string {
+    return caught instanceof ApiError ? caught.message : fallback;
+  }
+
+  async function handleAdd() {
+    setAdding(true);
+    setNotice(null);
+    try {
+      const result = await api.addStoreMember({ email: email.trim(), role });
+      setEmail('');
+      // Re-read the list so a reactivated (previously revoked) member cannot
+      // appear twice.
+      members.reload();
+      setNotice({ tone: 'good', text: result.message });
+    } catch (caught) {
+      setNotice({
+        tone: 'bad',
+        text: messageOf(caught, 'Could not add this member. Check the email and retry.'),
+      });
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function changeRole(member: StoreMember, nextRole: StoreRole) {
+    if (nextRole === member.role) return;
+    setBusyId(member.id);
+    setRowError(null);
+    try {
+      const updated = await api.updateStoreMemberRole(member.id, nextRole);
+      members.setData(rows.map((row) => (row.id === updated.id ? updated : row)));
+      setNotice({
+        tone: 'good',
+        text: `Role changed to ${updated.role}. Changing a role takes effect immediately — the person keeps or loses access from their next request.`,
+      });
+    } catch (caught) {
+      setRowError(messageOf(caught, 'Could not change this role. The previous role is unchanged.'));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function confirmRevoke(member: StoreMember) {
+    setBusyId(member.id);
+    setRowError(null);
+    try {
+      await api.revokeStoreMember(member.id);
+      members.setData(
+        rows.map((row) => (row.id === member.id ? { ...row, status: 'revoked' } : row)),
+      );
+      setConfirmingId(null);
+      setNotice({
+        tone: 'good',
+        text: `Access revoked for ${member.email}. This took effect immediately, including ending their active session.`,
+      });
+    } catch (caught) {
+      setRowError(messageOf(caught, 'Could not revoke this member. Their access is unchanged.'));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <section className="panel panel-pad settings-section" id="members">
+      <h2>Who works here.</h2>
+      <p className="muted">
+        Members sign in with their own account. Nobody is emailed automatically — share access with
+        people directly.
+      </p>
+      {!canManage && (
         <div className="mt-24">
-          <InlineNote tone="warn" title="Changing currency is not currency conversion.">
-            Keep historic orders in their original currency. Resolve supplier-currency mismatches
-            before approval; do not re-label previous amounts.
+          <InlineNote tone="neutral" title="Only the store owner can manage members.">
+            You can see the team, but adding people, changing roles and revoking access is up to the
+            owner.
           </InlineNote>
         </div>
-        <div className="form-actions">
-          <span aria-live="polite" className="small muted" role="status">
-            {statusText}
-          </span>
-          <Button
-            disabled={!dirty}
-            loading={save.phase === 'saving'}
-            loadingLabel="Saving…"
-            onClick={() => {
-              void handleSave();
-            }}
-            type="button"
-            variant="primary"
-          >
-            <Icon name="i-check" />
-            {save.phase === 'error' || save.phase === 'conflict' ? 'Retry save' : 'Save changes'}
-          </Button>
+      )}
+      {members.loading ? (
+        <p className="small muted">Loading members…</p>
+      ) : members.error ? (
+        <ErrorNote error={members.error} onRetry={members.reload} />
+      ) : rows.length === 0 ? (
+        <EmptyState icon="i-store" title="No teammates yet.">
+          Add a teammate by email once they have an account. Membership is recorded, not emailed.
+        </EmptyState>
+      ) : (
+        <Table caption={`Store members: ${rows.length}`} label="Store members" minWidth={640}>
+          <thead>
+            <tr>
+              <th scope="col">Member</th>
+              <th scope="col">Role</th>
+              <th scope="col">Status</th>
+              {canManage && <th scope="col">Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((member) => (
+              <tr key={member.id}>
+                <td>
+                  {member.email}
+                  {member.id === user?.id && <span className="sub"> (you)</span>}
+                </td>
+                <td>
+                  {canManage && member.status === 'active' ? (
+                    <Select
+                      aria-label={`Role for ${member.email}`}
+                      disabled={busyId === member.id}
+                      onChange={(event) => {
+                        void changeRole(member, event.target.value as StoreRole);
+                      }}
+                      value={member.role}
+                    >
+                      {ROLE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    member.role
+                  )}
+                </td>
+                <td>
+                  <StatusPill
+                    label={member.status}
+                    tone={member.status === 'active' ? 'good' : 'neutral'}
+                  />
+                </td>
+                {canManage && (
+                  <td>
+                    {member.status === 'active' &&
+                      (confirmingId === member.id ? (
+                        <span className="row">
+                          <span className="small muted">
+                            Ends their access and active session immediately.
+                          </span>
+                          <Button
+                            loading={busyId === member.id}
+                            onClick={() => {
+                              void confirmRevoke(member);
+                            }}
+                            size="sm"
+                            variant="danger"
+                          >
+                            Confirm revoke
+                          </Button>
+                          <Button
+                            disabled={busyId === member.id}
+                            onClick={() => setConfirmingId(null)}
+                            size="sm"
+                          >
+                            Cancel
+                          </Button>
+                        </span>
+                      ) : (
+                        <Button
+                          disabled={busyId === member.id}
+                          onClick={() => setConfirmingId(member.id)}
+                          size="sm"
+                        >
+                          <Icon name="i-trash" />
+                          Revoke
+                        </Button>
+                      ))}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+      {rowError && (
+        <div className="mt-24">
+          <InlineNote tone="bad">{rowError}</InlineNote>
         </div>
-      </section>
-    </div>
+      )}
+      {canManage && (
+        <div className="mt-24">
+          <div className="field-grid two">
+            <Field
+              help="They must already have an account — membership is recorded, no email is sent."
+              label="Email"
+            >
+              <Input
+                onChange={(event) => setEmail(event.target.value)}
+                type="email"
+                value={email}
+              />
+            </Field>
+            <Field
+              help="Owners manage the store; operators run it; viewers read only."
+              label="Role"
+            >
+              <Select onChange={(event) => setRole(event.target.value as StoreRole)} value={role}>
+                {ROLE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <div className="form-actions">
+            <Button
+              disabled={email.trim() === ''}
+              loading={adding}
+              loadingLabel="Adding…"
+              onClick={() => {
+                void handleAdd();
+              }}
+              type="button"
+              variant="primary"
+            >
+              <Icon name="i-plus" />
+              Add member
+            </Button>
+          </div>
+        </div>
+      )}
+      <div aria-live="polite" className="small muted mt-24">
+        {notice?.text ?? ''}
+      </div>
+    </section>
   );
 }

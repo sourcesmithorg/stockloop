@@ -354,6 +354,32 @@ class ApprovalOut(ApiModel):
     orders: list[OrderSummary] = Field(default_factory=list)
 
 
+class ExportRequest(BaseModel):
+    actorId: str = "owner"
+
+
+class ExportAttemptOut(ApiModel):
+    """One export attempt. `succeeded` means the document was produced and is
+    retrievable at documentUrl — never that the supplier received or accepted
+    anything.
+    """
+
+    id: str
+    orderId: str
+    displayNumber: str
+    status: str
+    failureCode: str | None = None
+    failureMessage: str | None = None
+    documentDigest: str | None = None
+    documentUrl: str
+    approvalId: str
+    planId: str
+    planVersion: int
+    currency: str
+    attemptedAt: datetime
+    disclaimer: str
+
+
 class PlanDetailOut(ApiModel):
     id: str
     storeId: str
@@ -569,3 +595,31 @@ class MeOut(BaseModel):
     store: StoreOut
     preferences: PreferencesOut
     firstRunComplete: bool
+
+
+# --------------------------------------------------------------------------- store members
+
+
+class MemberOut(ApiModel):
+    id: str  # user id
+    email: str
+    role: str
+    status: str
+    createdAt: datetime
+
+
+class MemberAddRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    role: str = Field(min_length=1, max_length=24)
+
+
+class MemberRoleUpdate(BaseModel):
+    role: str = Field(min_length=1, max_length=24)
+
+
+class MemberResult(ApiModel):
+    member: MemberOut
+    # Always false: there is no mail infrastructure and none is authorized.
+    # The API records the membership; nobody is contacted.
+    notified: bool = False
+    message: str

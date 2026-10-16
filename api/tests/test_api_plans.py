@@ -71,7 +71,11 @@ def test_seeded_plan_fixture_totals(client: TestClient) -> None:
 
 
 def test_seeded_plan_rule_trace_and_approval(client: TestClient) -> None:
-    plan = _plan(client, client.get("/api/plans").json()[0]["id"])
+    # Pin the seeded fixture plan by id: list order is not a stable selector
+    # once other tests approve fresh plans on the shared store.
+    from app.seed import PLAN_ID
+
+    plan = _plan(client, PLAN_ID)
     oat = _line(plan, "SKU-001")
     trace = oat["ruleTrace"]
     assert trace["demandPerDay"] == "4"

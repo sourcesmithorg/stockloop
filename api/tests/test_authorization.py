@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 UNAUTH_GETS = [
     "/api/auth/me",
     "/api/store",
+    "/api/store/members",
     "/api/suppliers",
     "/api/products",
     "/api/inventory/risk",

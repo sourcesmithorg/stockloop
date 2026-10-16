@@ -4,21 +4,29 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import api_error, get_session, get_store
+from app.deps import api_error, get_session, get_store, require_role
 from app.domain.calculations import quantize_money
 from app.models import Approval, PurchaseOrder, Store, Supplier
-from app.schemas import OrderDetailOut, OrderLineSnapshot, OrderSummary
+from app.schemas import (
+    ExportAttemptOut,
+    ExportRequest,
+    OrderDetailOut,
+    OrderLineSnapshot,
+    OrderSummary,
+)
+from app.services.exports import (
+    DISCLAIMER,
+    attempt_out,
+    create_export,
+    list_attempts,
+    order_document,
+)
 
 router = APIRouter(prefix="/orders", tags=["orders"])
-
-DISCLAIMER = (
-    "Order document only — nothing has been sent to the supplier; "
-    "no purchase has been placed or accepted."
-)
 
 
 async def _order_summaries(
@@ -111,4 +119,55 @@ async def get_order(
         ],
         supplierSnapshot=order.supplier_snapshot,
         disclaimer=DISCLAIMER,
+    )
+
+
+@router.post("/{orderId}/export", response_model=ExportAttemptOut)
+async def export_order(
+    orderId: str,
+    body: ExportRequest | None = None,
+    session: AsyncSession = Depends(get_session),
+    store: Store = Depends(get_store),
+    _role: None = Depends(require_role("operator")),
+) -> ExportAttemptOut:
+    """Produce the document for the approved current version and record the attempt.
+
+    Refusals (superseded document, stale approval, plan moved on) are 409s with
+    a field-scoped conflict — and are themselves recorded as failed attempts.
+    Success means the file was produced locally, never that a supplier was
+    contacted.
+    """
+    attempt, _html = await create_export(
+        session, store, orderId, actor_id=body.actorId if body else "owner"
+    )
+    order = await session.get(PurchaseOrder, orderId)
+    assert order is not None  # create_export already resolved it
+    return ExportAttemptOut(**attempt_out(attempt, order))
+
+
+@router.get("/{orderId}/exports", response_model=list[ExportAttemptOut])
+async def get_order_exports(
+    orderId: str,
+    session: AsyncSession = Depends(get_session),
+    store: Store = Depends(get_store),
+) -> list[ExportAttemptOut]:
+    rows = await list_attempts(session, store, orderId)
+    return [ExportAttemptOut(**row) for row in rows]
+
+
+@router.get("/{orderId}/document")
+async def get_order_document(
+    orderId: str,
+    session: AsyncSession = Depends(get_session),
+    store: Store = Depends(get_store),
+) -> Response:
+    """Print-friendly HTML for the approved current version (same guards as export)."""
+    html, digest = await order_document(session, store, orderId)
+    return Response(
+        content=html,
+        media_type="text/html; charset=utf-8",
+        headers={
+            "Content-Disposition": f'inline; filename="{orderId}.html"',
+            "ETag": f'"{digest}"',
+        },
     )
