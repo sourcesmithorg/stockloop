@@ -164,7 +164,7 @@ async def preview_import(
                     "missing_required_column",
                     "blocking",
                     expected=f"column '{column}'",
-                    hint=f"Add or map a '{column}' column, then revalidate (T-07)",
+                    hint=f"Add or map a '{column}' column, then revalidate",
                 )
             )
         return await _persist(session, store, job, issues)

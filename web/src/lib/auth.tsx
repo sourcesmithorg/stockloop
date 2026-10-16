@@ -14,7 +14,7 @@ import {
   type User,
 } from '@/lib/api';
 
-export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
+export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'unreachable';
 
 /** Store fields the provider lets screens change; versions stay internal. */
 export interface StorePatch {
@@ -58,6 +58,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  * store/preferences (with their optimistic-concurrency versions) so screens
  * never juggle expectedVersion themselves. A 401 on any authed call moves
  * status to 'unauthenticated'; the route guard in App.tsx does the redirect.
+ * Any other failure (5xx, network, timeout) moves status to 'unreachable':
+ * the session is unknown, NOT revoked — it is kept and the guard shows an
+ * honest failure screen with a retry instead of pretending the user signed out.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<MeOut | null>(null);
@@ -86,9 +89,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       apply(await api.me());
     } catch (error) {
-      // Session gone (401) or backend unreachable: fall back to unauthenticated
-      // so the guard can route to /login; callers still receive the error.
-      clear();
+      if (error instanceof ApiError && error.status === 401) {
+        // Session genuinely gone: clear it so the guard routes to /login.
+        clear();
+      } else {
+        // Backend unreachable (5xx / network failure / timeout): the session
+        // is unknown, not revoked. Keep it; the guard surfaces the failure
+        // with a retry. Callers still receive the error.
+        setStatus('unreachable');
+      }
       throw error;
     }
   }, [apply, clear]);
@@ -118,11 +127,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    try {
-      await api.logout();
-    } finally {
-      clear();
-    }
+    // Clear local state only after the server confirmed the sign-out. The
+    // httpOnly cookie cannot be removed from JS — clearing first would pretend
+    // a sign-out that never happened (the same conflation as a server outage
+    // reading as logout). On failure the caller surfaces the error and the
+    // session stays exactly as it is.
+    await api.logout();
+    clear();
   }, [clear]);
 
   const updateStore = useCallback(

@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { AppShell } from '@/components/layout/app-shell';
+import { Button } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
   ImportMappingPage,
@@ -37,6 +38,34 @@ function LoadingScreen() {
   return (
     <div className="grid min-h-screen place-items-center" role="status">
       <p className="small muted">Loading StockLoop…</p>
+    </div>
+  );
+}
+
+/**
+ * Backend unreachable: the session is UNKNOWN, not revoked — the user was not
+ * signed out and must not be told so. Honest failure with a retry that
+ * re-attempts the session read; nothing is cached or faked.
+ */
+function UnreachableScreen() {
+  const { refresh } = useAuth();
+  return (
+    <div className="grid min-h-screen place-items-center" role="alert">
+      <div className="stack text-center">
+        <p>Cannot reach StockLoop right now. You are still signed in.</p>
+        <p className="small muted">Your session was not signed out.</p>
+        <div>
+          <Button
+            onClick={() => {
+              void refresh().catch(() => undefined);
+            }}
+            type="button"
+            variant="primary"
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -80,6 +109,8 @@ function AppRoutes() {
 /**
  * Auth guard around the route table:
  *  - loading: render a minimal status screen, never redirect;
+ *  - unreachable (backend down): render an honest failure with retry — the
+ *    session is unknown, never treated as revoked; only public routes render;
  *  - unauthenticated: `/` renders the public landing page, `/login` (or
  *    `/register`) stay put, everything else redirects to /login?next=<path>;
  *  - authenticated without a completed first run: /onboarding (except while
@@ -93,6 +124,11 @@ export default function App() {
   const standalone = location.pathname === '/login' || location.pathname === '/register';
 
   if (status === 'loading') return <LoadingScreen />;
+
+  if (status === 'unreachable') {
+    if (standalone || location.pathname === '/') return <AppRoutes />;
+    return <UnreachableScreen />;
+  }
 
   if (status === 'authenticated') {
     if (!firstRunComplete && location.pathname !== '/onboarding') {

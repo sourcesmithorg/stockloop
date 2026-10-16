@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
+import { api, ApiError } from '@/lib/api';
 import { AuthProvider } from '@/lib/auth';
 import { mockApi } from '@/lib/mock';
 import { SettingsPage } from '@/pages/settings';
@@ -86,5 +87,67 @@ describe('settings regional save flow (T-05)', () => {
     await user.click(screen.getByRole('button', { name: /Retry save/ }));
     await waitFor(() => expect(status).toHaveTextContent(/Changes saved/));
     expect(country).toHaveValue('GB');
+  }, 20_000);
+});
+
+function renderSettingsRoutes() {
+  return render(
+    <MemoryRouter initialEntries={['/settings']}>
+      <AuthProvider>
+        <Routes>
+          <Route element={<h1>Standalone</h1>} path="/" />
+          <Route element={<SettingsPage />} path="/settings" />
+        </Routes>
+      </AuthProvider>
+    </MemoryRouter>,
+  );
+}
+
+describe('settings account section and sign-out', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders the #account section the header and sidebar link to', async () => {
+    await seedRegistration('owner-account@example.test');
+    renderSettings();
+    const heading = await screen.findByRole('heading', { level: 2, name: 'Your account' });
+    const section = heading.closest('section');
+    // The app links avatar/profile to /settings#account — the anchor must exist.
+    expect(section?.id).toBe('account');
+    expect(section).toHaveTextContent('owner-account@example.test');
+    expect(section).toHaveTextContent('Store owner');
+    expect(within(section as HTMLElement).getByRole('button', { name: /Sign out/ })).toBeEnabled();
+  }, 20_000);
+
+  it('signing out clears the session and lands on the public page', async () => {
+    await seedRegistration('owner-signout@example.test');
+    renderSettingsRoutes();
+    const button = await screen.findByRole('button', { name: /Sign out/ });
+    await userEvent.setup().click(button);
+    // Cleared session: navigation to the public page happened, and only then
+    // is the mock session verifiably gone.
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Standalone' }),
+    ).toBeInTheDocument();
+    await expect(mockApi.me()).rejects.toThrow();
+  }, 20_000);
+
+  it('a failed sign-out is surfaced and does not pretend to have signed out', async () => {
+    await seedRegistration('owner-signout-fail@example.test');
+    vi.spyOn(api, 'logout').mockRejectedValue(new ApiError(502, '502 Bad Gateway on /auth/logout'));
+    renderSettingsRoutes();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Sign out/ }));
+    const status = await screen.findByText(/502 Bad Gateway on \/auth\/logout/);
+    expect(status).toBeInTheDocument();
+    // Session kept: still on settings, still signed in (scoped to #account —
+    // the members table lists the same email).
+    const heading = screen.getByRole('heading', { level: 2, name: 'Your account' });
+    expect(heading).toBeInTheDocument();
+    const section = heading.closest('section');
+    expect(
+      within(section as HTMLElement).getByText('owner-signout-fail@example.test'),
+    ).toBeInTheDocument();
   }, 20_000);
 });

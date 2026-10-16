@@ -190,9 +190,11 @@ function OrderRow({ order }: { order: OrderSummary }) {
       </td>
       <ExportCell order={order} />
       <td>
-        <Link className="btn small-btn" to={`/orders/${order.id}`}>
+        {/* Same-origin, cookie-authenticated document — a plain link is the
+            honest path; no fetch-then-blob indirection. */}
+        <a className="btn small-btn" href={`/api/orders/${order.id}/document`}>
           Open document
-        </Link>
+        </a>
       </td>
     </tr>
   );

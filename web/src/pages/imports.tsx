@@ -17,7 +17,13 @@ import {
   buttonClass,
 } from '@/components/ui';
 import { StatusPill } from '@/components/ui/status-pill';
-import { api, type ImportDataset, type ImportPreview, type ImportResult } from '@/lib/api';
+import {
+  api,
+  type ImportDataset,
+  type ImportIssue,
+  type ImportPreview,
+  type ImportResult,
+} from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { formatDate } from '@/lib/risk-display';
 import { useApi } from '@/lib/use-api';
@@ -32,6 +38,18 @@ const DATASET_LABELS: Record<ImportDataset, string> = {
   inventory: 'Inventory snapshot',
   sales: 'Sales history',
 };
+
+/**
+ * Display-layer guarantee: internal identifiers (e.g. "(T-07)") never reach a
+ * user, no matter what the backend puts in a hint — the backend no longer
+ * emits them, and this guard is what keeps that true for stored legacy rows,
+ * other consumers, and any future hint. Do NOT delete as redundant.
+ * Keeps the actionable meaning intact.
+ */
+function userHint(issue: ImportIssue): string {
+  const raw = issue.correctionHint ?? issue.expectedFormat ?? 'See expected format.';
+  return raw.replace(/\s*\(T-\d+\)\s*$/, '').trimEnd();
+}
 
 /**
  * Data imports — POST /api/imports/preview (multipart) then POST
@@ -267,9 +285,7 @@ export function ImportsPage() {
                             tone={issue.severity === 'blocking' ? 'bad' : 'warn'}
                           />
                         </td>
-                        <td>
-                          {issue.correctionHint ?? issue.expectedFormat ?? 'See expected format.'}
-                        </td>
+                        <td>{userHint(issue)}</td>
                       </tr>
                     ))}
                   </tbody>

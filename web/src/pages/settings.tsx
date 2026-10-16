@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { PageHead } from '@/components/layout/page-head';
 import { Icon } from '@/components/layout/icon';
@@ -42,6 +43,7 @@ export function SettingsPage() {
         <div className="settings-grid">
           <RegionForm initialPreferences={preferences} initialStore={store} />
           <MembersSection />
+          <AccountSection />
         </div>
       ) : (
         <p className="small muted">Loading settings…</p>
@@ -467,6 +469,75 @@ function MembersSection() {
       )}
       <div aria-live="polite" className="small muted mt-24">
         {notice?.text ?? ''}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Account section — ported from .template/settings.html (#account): identity,
+ * access facts, and the sign-out control that section exists for. Email and
+ * role are read from the live session; there is no editable name because the
+ * account model has none (never fabricate a field the backend cannot honor).
+ */
+function AccountSection() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    setError(null);
+    try {
+      await logout();
+      // Signed out for real (server cleared the cookie): the honest
+      // destination is the public landing page.
+      navigate('/');
+    } catch (caught) {
+      // The server could not confirm the sign-out, so nothing was cleared —
+      // say so instead of pretending the user signed out.
+      setError(caught instanceof Error ? caught.message : 'Could not sign out.');
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
+  return (
+    <section className="panel panel-pad settings-section" id="account">
+      <h2>Your account</h2>
+      <p className="muted">Identity and access for this session.</p>
+      <dl className="facts numeric">
+        <div>
+          <dt>Email</dt>
+          <dd>{user?.email ?? 'Unknown'}</dd>
+        </div>
+        <div>
+          <dt>Role</dt>
+          <dd>{user?.role === 'owner' ? 'Store owner' : (user?.role ?? 'Unknown')}</dd>
+        </div>
+        <div>
+          <dt>Password</dt>
+          <dd>Managed by your authentication layer</dd>
+        </div>
+      </dl>
+      <div className="row wrap mt-24">
+        <Button
+          loading={signingOut}
+          loadingLabel="Signing out…"
+          onClick={() => {
+            void handleSignOut();
+          }}
+          type="button"
+        >
+          <Icon name="i-logout" />
+          Sign out
+        </Button>
+      </div>
+      {/* aria-live only, no role: RegionForm's save status owns role="status"
+          on this page, and getByRole must stay unambiguous. */}
+      <div aria-live="polite" className="small muted mt-24">
+        {error ?? ''}
       </div>
     </section>
   );

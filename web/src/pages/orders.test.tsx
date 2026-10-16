@@ -65,6 +65,17 @@ describe('purchase orders (live data)', () => {
     expect(screen.getByText(/Export is not order placement/)).toBeInTheDocument();
   });
 
+  it('links Open document at the real document endpoint, never a SPA route', async () => {
+    await seedOwner('po-doc-link@example.test');
+    renderOrders();
+    await screen.findByRole('table', { name: /Purchase-order history/ });
+    const links = screen.getAllByRole('link', { name: 'Open document' });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.getAttribute('href')).toMatch(/^\/api\/orders\/[^/]+\/document$/);
+    }
+  });
+
   it('searches by supplier and shows an honest no-match state', async () => {
     await seedOwner('po-search@example.test');
     renderOrders();
