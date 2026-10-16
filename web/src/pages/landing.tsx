@@ -14,7 +14,7 @@ import { usePageTitle } from '@/lib/use-page-title';
  * metrics, logos, testimonials, or screenshots (AGENTS.md).
  */
 export function LandingPage() {
-  usePageTitle('StockLoop — inventory purchasing copilot');
+  usePageTitle('Inventory purchasing copilot');
 
   return (
     <AuthLayout>

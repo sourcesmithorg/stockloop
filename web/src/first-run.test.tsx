@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -19,7 +19,7 @@ function renderApp(path: string) {
   );
 }
 
-async function seedRegistration(email: string) {
+async function seedRegistration(email: string, storeName = 'Fresh Store') {
   // Real provider path: the module-scoped mock session is what AuthProvider's
   // initial refresh() reads, exactly like the cookie session in production.
   await mockApi.register({
@@ -28,7 +28,7 @@ async function seedRegistration(email: string) {
     email,
     language: 'en',
     password: 'correct-horse-battery',
-    storeName: 'Fresh Store',
+    storeName,
     timezone: 'UTC',
   });
 }
@@ -67,5 +67,26 @@ describe('first-run completion (lockout regression)', () => {
       await screen.findByRole('heading', { level: 1, name: /A little foresight/ }),
     ).toBeInTheDocument();
     expect((await mockApi.me()).store.firstRunComplete).toBe(true);
+  });
+
+  it('overview describes the real store, never a hardcoded fixture name (F4)', async () => {
+    await seedRegistration('fr-three@example.test', 'Evidence Test Store');
+    await mockApi.updateStore({ completeFirstRun: true, expectedVersion: 1 });
+    renderApp('/overview');
+    await screen.findByRole('heading', { level: 1, name: /A little foresight/ });
+    expect(screen.getByText(/deserves a look at Evidence Test Store today/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('Maple & Main');
+  });
+
+  it('sidebar profile link has a coherent accessible name, not a concatenation (F5)', async () => {
+    await seedRegistration('fr-four@example.test');
+    await mockApi.updateStore({ completeFirstRun: true, expectedVersion: 1 });
+    renderApp('/overview');
+    await screen.findByRole('heading', { level: 1, name: /A little foresight/ });
+    const sidebar = screen.getByRole('complementary', { name: 'Main navigation' });
+    const profile = within(sidebar).getByRole('link', { name: 'fr-four@example.test account' });
+    expect(profile).toHaveAttribute('href', '/settings#account');
+    // The pre-fix accessible name was avatar+email+role glued together.
+    expect(screen.queryByRole('link', { name: /@example\.testowner/ })).toBeNull();
   });
 });

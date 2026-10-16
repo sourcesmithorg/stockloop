@@ -54,7 +54,11 @@ export function Sidebar() {
           </Link>
         ))}
         {profileName && profileInitials && (
-          <Link className="sidebar-profile" to="/settings#account">
+          <Link
+            aria-label={`${profileName} account`}
+            className="sidebar-profile"
+            to="/settings#account"
+          >
             <span className="avatar">{profileInitials}</span>
             <span>
               <strong>{profileName}</strong>

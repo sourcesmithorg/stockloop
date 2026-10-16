@@ -3,7 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { PageHead } from '@/components/layout/page-head';
 import { buttonClass, InlineNote } from '@/components/ui';
 import { USE_MOCK } from '@/lib/api';
-import { DEMO_DATE } from '@/lib/mock/fixtures';
+import { useAuth } from '@/lib/auth';
+import { DEMO_DATE, STORE } from '@/lib/mock/fixtures';
 import { usePageTitle } from '@/lib/use-page-title';
 
 import { PlaceholderPage } from './placeholder';
@@ -16,6 +17,9 @@ export { SettingsPage } from './settings';
 export { WelcomePage } from './welcome';
 
 export function OverviewPage() {
+  const { store } = useAuth();
+  // Real session store name; fixtures only in demo builds — never hardcoded.
+  const storeName = store?.name ?? (USE_MOCK ? STORE.name : null);
   return (
     <PlaceholderPage
       actions={
@@ -23,7 +27,11 @@ export function OverviewPage() {
           Review restock plan
         </Link>
       }
-      description="Here’s what deserves a look at Maple & Main today."
+      description={
+        storeName
+          ? `Here’s what deserves a look at ${storeName} today.`
+          : 'Here’s what deserves a look today.'
+      }
       docTitle="Overview"
       eyebrow={USE_MOCK ? DEMO_DATE.label : undefined}
       note="Scoped restock suggestions, priority table, freshness, budget and activity — fed by GET /api/inventory/risk and GET /api/plans/{id}."

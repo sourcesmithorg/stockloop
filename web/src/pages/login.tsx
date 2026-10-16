@@ -11,7 +11,9 @@ import { usePageTitle } from '@/lib/use-page-title';
 
 /** Sign-in — .template/login.html. On success the route guard in App.tsx
  * sends the session to ?next= (default /overview), or to /onboarding for a
- * brand-new account. */
+ * brand-new account.
+ * Deliberate divergence: no password-reset link. The template's is a fixture
+ * and the real app has no reset feature — a dead link would be a false action. */
 export function LoginPage() {
   usePageTitle('Sign in');
   const { login } = useAuth();

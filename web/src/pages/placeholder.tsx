@@ -45,10 +45,8 @@ export function PlaceholderPage({
           contract.
         </p>
         <InlineNote title="Fixture data only">
-          No live API is connected yet. Screens read the fixture layer in{' '}
-          <code className="mono">src/lib/mock</code>; set{' '}
-          <code className="mono">VITE_USE_MOCK=false</code> to hit the real backend through the dev
-          proxy.
+          This screen is not yet connected to your store data — the content below is a fixture
+          example until this route’s API integration lands. No configuration change will connect it.
         </InlineNote>
       </div>
     </>
