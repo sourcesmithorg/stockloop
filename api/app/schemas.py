@@ -511,6 +511,7 @@ class StoreOut(ApiModel):
     defaultCurrency: str
     timezone: str
     version: int
+    firstRunComplete: bool
 
 
 class PreferencesOut(ApiModel):
@@ -543,6 +544,8 @@ class StoreUpdate(BaseModel):
     defaultCurrency: str | None = None
     timezone: str | None = None
     expectedVersion: int | None = None
+    # Explicit onboarding completion: true flips store.first_run_complete (one-way).
+    completeFirstRun: bool = False
 
 
 class StoreResult(BaseModel):

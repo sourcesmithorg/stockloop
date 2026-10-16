@@ -45,4 +45,51 @@ describe('auth gate', () => {
       await screen.findByRole('heading', { level: 1, name: /Local to you/ }),
     ).toBeInTheDocument();
   });
+
+  it('routes an authenticated completed session into the app, not onboarding', () => {
+    authState.status = 'authenticated';
+    authState.firstRunComplete = true;
+    render(
+      <MemoryRouter initialEntries={['/overview']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: /A little foresight/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: /Local to you/ })).toBeNull();
+  });
+
+  it('renders the public landing at `/` for unauthenticated visitors', () => {
+    authState.status = 'unauthenticated';
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: /Know what to order/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Start with your store/ })).toHaveAttribute(
+      'href',
+      '/register',
+    );
+    for (const link of screen.getAllByRole('link', { name: 'Sign in' })) {
+      expect(link).toHaveAttribute('href', '/login');
+    }
+  });
+
+  it('sends authenticated visitors at `/` into the app, not the landing', async () => {
+    authState.status = 'authenticated';
+    authState.firstRunComplete = true;
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /A little foresight/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: /Know what to order/ })).toBeNull();
+  });
 });

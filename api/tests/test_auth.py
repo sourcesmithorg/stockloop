@@ -143,3 +143,54 @@ class TestPasswordStorage:
         assert stored != body["password"]
         assert stored.startswith("scrypt$")
         assert body["password"] not in stored
+
+
+class TestFirstRunCompletion:
+    """P0 regression: firstRunComplete is an explicit onboarding flag, never
+    inferred from data readiness — a fresh store must reach the app."""
+
+    def test_register_starts_incomplete(self, unauth_client: TestClient):
+        _, body = _register(unauth_client)
+        me = unauth_client.get("/api/auth/me")
+        assert me.status_code == 200
+        assert me.json()["firstRunComplete"] is False
+        # GET /api/store reflects the same flag.
+        store = unauth_client.get("/api/store").json()["store"]
+        assert store["firstRunComplete"] is False
+
+    def test_region_saves_alone_do_not_complete_first_run(self, unauth_client: TestClient):
+        _register(unauth_client)
+        store = unauth_client.get("/api/auth/me").json()["store"]
+        resp = unauth_client.post(
+            "/api/store",
+            json={
+                "country": "SG",
+                "timezone": "Asia/Singapore",
+                "expectedVersion": store["version"],
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        assert unauth_client.get("/api/auth/me").json()["firstRunComplete"] is False
+
+    def test_explicit_completion_flips_flag_and_admits_empty_store(self, unauth_client: TestClient):
+        _register(unauth_client)
+        store = unauth_client.get("/api/auth/me").json()["store"]
+        resp = unauth_client.post(
+            "/api/store",
+            json={"completeFirstRun": True, "expectedVersion": store["version"]},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["store"]["firstRunComplete"] is True
+        assert unauth_client.get("/api/auth/me").json()["firstRunComplete"] is True
+
+        # The lockout case: no products, no imports — yet operational routes
+        # answer 200, so the guard (fed by /me) admits the store to the app.
+        orders = unauth_client.get("/api/orders")
+        assert orders.status_code == 200
+        assert orders.json() == []
+        assert unauth_client.get("/api/auth/me").json()["firstRunComplete"] is True
+
+    def test_seeded_fixture_store_reports_first_run_true(self, client: TestClient):
+        me = client.get("/api/auth/me")
+        assert me.status_code == 200
+        assert me.json()["firstRunComplete"] is True

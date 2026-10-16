@@ -8,6 +8,7 @@ import {
   ImportValidationPage,
   ImportsPage,
   InventoryPage,
+  LandingPage,
   LoginPage,
   NotFoundPage,
   OnboardingPage,
@@ -43,16 +44,18 @@ function LoadingScreen() {
 /**
  * Route table. Every route renders exactly one <h1> (PageHead) inside the
  * shell's single <main>; unknown paths get the useful not-found state.
- * Login/register/onboarding are standalone full-page layouts outside the shell.
+ * Login/register/onboarding are standalone full-page layouts outside the shell;
+ * the public landing at `/` is standalone too and only ever renders for
+ * unauthenticated visitors (the guard sends authenticated `/` into the app).
  */
 function AppRoutes() {
   return (
     <Routes>
       <Route path="login" element={<LoginPage />} />
       <Route path="register" element={<RegisterPage />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="onboarding" element={<OnboardingPage />} />
       <Route element={<AppShell />}>
-        <Route index element={<Navigate replace to="/overview" />} />
         <Route path="overview" element={<OverviewPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="inventory/:productId" element={<ProductPage />} />
@@ -77,11 +80,12 @@ function AppRoutes() {
 /**
  * Auth guard around the route table:
  *  - loading: render a minimal status screen, never redirect;
- *  - unauthenticated: /login (or /register) only, everything else redirects
- *    to /login?next=<current path>;
+ *  - unauthenticated: `/` renders the public landing page, `/login` (or
+ *    `/register`) stay put, everything else redirects to /login?next=<path>;
  *  - authenticated without a completed first run: /onboarding (except while
  *    already there);
- *  - authenticated: the app, with /onboarding and /welcome reachable.
+ *  - authenticated: the app, with `/` landing in the app (/overview) rather
+ *    than the public landing, and /onboarding /welcome reachable.
  */
 export default function App() {
   const { status, firstRunComplete } = useAuth();
@@ -94,6 +98,10 @@ export default function App() {
     if (!firstRunComplete && location.pathname !== '/onboarding') {
       return <Navigate to="/onboarding" replace />;
     }
+    if (location.pathname === '/') {
+      // Authenticated visitors land in the app, never on the public landing.
+      return <Navigate to="/overview" replace />;
+    }
     if (standalone) {
       const next = new URLSearchParams(location.search).get('next');
       return <Navigate to={safeNext(next)} replace />;
@@ -101,7 +109,7 @@ export default function App() {
     return <AppRoutes />;
   }
 
-  if (standalone) return <AppRoutes />;
+  if (standalone || location.pathname === '/') return <AppRoutes />;
   const next = `${location.pathname}${location.search}`;
   return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
 }

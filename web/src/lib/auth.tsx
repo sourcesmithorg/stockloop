@@ -23,6 +23,7 @@ export interface StorePatch {
   locale?: string;
   defaultCurrency?: string;
   timezone?: string;
+  completeFirstRun?: boolean;
 }
 
 /** Preference fields the provider lets screens change; versions stay internal. */
@@ -100,8 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (credentials: AuthCredentials) => {
       const result = await api.login(credentials);
-      // Login responses carry no firstRunComplete — me() below is authoritative.
-      apply({ ...result, firstRunComplete: false });
+      // The response carries the store's flag; refresh() below re-reads /me as
+      // the authoritative session state.
+      apply({ ...result, firstRunComplete: result.store.firstRunComplete });
       await refresh();
     },
     [apply, refresh],
@@ -110,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (input: RegisterInput) => {
       const result = await api.register(input);
-      apply({ ...result, firstRunComplete: false });
+      apply({ ...result, firstRunComplete: result.store.firstRunComplete });
     },
     [apply],
   );

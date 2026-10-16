@@ -19,6 +19,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -45,6 +46,11 @@ class Store(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     # Purchase-order document sequence (last used number).
     document_seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Explicit setup completion: the owner finished onboarding (POST /api/store
+    # with completeFirstRun). New stores start false; completion is one-way true.
+    first_run_complete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -50,8 +50,9 @@ export function OnboardingPage() {
     setSubmitting(true);
     setError(null);
     try {
-      // Saving the store region is what completes the first run.
-      await updateStore({ name, country, timezone });
+      // Completion is an explicit one-way flag (completeFirstRun), never inferred
+      // from the region values being saved.
+      await updateStore({ name, country, timezone, completeFirstRun: true });
       if (language !== preferences?.locale || currency !== preferences?.displayCurrency) {
         await updatePreferences({ locale: language, displayCurrency: currency });
       }

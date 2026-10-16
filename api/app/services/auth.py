@@ -245,23 +245,6 @@ async def load_session_user(
     return SessionUser(user_id=user.id, email=user.email, store_id=store_id, role=membership.role)
 
 
-async def first_run_complete(session: AsyncSession, store_id: str) -> bool:
-    """A store is past first run once it has products OR a committed import."""
-    from app.models import ImportJob, Product
-
-    has_products = await session.scalar(
-        select(select(Product).where(Product.store_id == store_id).exists())
-    )
-    has_committed = await session.scalar(
-        select(
-            select(ImportJob)
-            .where(ImportJob.store_id == store_id, ImportJob.status == "committed")
-            .exists()
-        )
-    )
-    return bool(has_products or has_committed)
-
-
 from app.schemas import PreferencesOut, StoreOut  # noqa: E402  (avoid cycle: schemas is auth-free)
 
 
@@ -274,6 +257,7 @@ def store_out(store: Store) -> StoreOut:
         defaultCurrency=store.default_currency,
         timezone=store.timezone,
         version=store.version,
+        firstRunComplete=store.first_run_complete,
     )
 
 

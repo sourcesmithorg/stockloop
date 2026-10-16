@@ -27,7 +27,6 @@ from app.services.auth import (
     EmailExistsError,
     SessionUser,
     create_session,
-    first_run_complete,
     preferences_out,
     register,
     store_out,
@@ -178,12 +177,11 @@ async def me(
     user: SessionUser = Depends(get_session_user),
     store: Store = Depends(get_store),
 ) -> MeOut:
-    """Authenticated user, their store, preferences and readiness flag."""
+    """Authenticated user, their store, preferences and onboarding-completion flag."""
     pref = await session.get(Preference, (store.id, user.user_id))
-    first_run = await first_run_complete(session, store.id)
     return MeOut(
         user=UserOut(id=user.user_id, email=user.email, role=user.role),
         store=store_out(store),
         preferences=preferences_out(pref),
-        firstRunComplete=first_run,
+        firstRunComplete=store.first_run_complete,
     )

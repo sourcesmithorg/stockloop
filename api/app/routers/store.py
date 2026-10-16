@@ -71,6 +71,10 @@ async def update_store(
             "invalid_timezone", f"Unknown timezone {body.timezone}", 400, field="timezone"
         )
     changed = False
+    if body.completeFirstRun and not store.first_run_complete:
+        # Explicit, one-way onboarding completion (never inferred from region changes).
+        store.first_run_complete = True
+        changed = True
     if body.name is not None:
         store.name = body.name
         changed = True

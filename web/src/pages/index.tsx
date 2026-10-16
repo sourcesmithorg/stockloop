@@ -8,6 +8,7 @@ import { usePageTitle } from '@/lib/use-page-title';
 
 import { PlaceholderPage } from './placeholder';
 
+export { LandingPage } from './landing';
 export { LoginPage } from './login';
 export { OnboardingPage } from './onboarding';
 export { RegisterPage } from './register';

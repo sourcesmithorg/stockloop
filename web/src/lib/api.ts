@@ -344,6 +344,7 @@ export interface Store {
   defaultCurrency: string;
   timezone: string;
   version: number;
+  firstRunComplete: boolean;
 }
 
 export interface Preferences {
@@ -406,6 +407,8 @@ export interface StoreUpdateInput {
   defaultCurrency?: string;
   timezone?: string;
   expectedVersion: number;
+  /** Explicit one-way onboarding completion (mirrors POST /api/store). */
+  completeFirstRun?: boolean;
 }
 
 export interface PreferencesUpdateInput {

@@ -148,6 +148,9 @@ async def seed(session: AsyncSession) -> dict[str, object]:
             version=1,
             # Fixture: template documents start at PO-2026-0142.
             document_seq=141,
+            # The demo store ships with products/plans — setup is complete, so it
+            # must not be bounced to /onboarding (migration backfills live stores).
+            first_run_complete=True,
             created_at=datetime.now(UTC),
         )
         session.add(store)

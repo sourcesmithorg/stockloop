@@ -28,7 +28,6 @@ interface MockAccount {
   user: User;
   store: Store;
   preferences: Preferences;
-  firstRunComplete: boolean;
 }
 
 const accounts = new Map<string, MockAccount>();
@@ -104,6 +103,7 @@ export async function mockRegister(input: RegisterInput): Promise<AuthResult> {
       defaultCurrency: input.currency,
       timezone: input.timezone,
       version: 1,
+      firstRunComplete: false,
     },
     preferences: {
       locale: input.language,
@@ -113,7 +113,6 @@ export async function mockRegister(input: RegisterInput): Promise<AuthResult> {
       numberFormat: 'en',
       version: 1,
     },
-    firstRunComplete: false,
   };
   accounts.set(input.email, account);
   session = account;
@@ -122,7 +121,7 @@ export async function mockRegister(input: RegisterInput): Promise<AuthResult> {
 
 export async function mockMe(): Promise<MeOut> {
   const account = requireSession();
-  return { ...authResult(account), firstRunComplete: account.firstRunComplete };
+  return { ...authResult(account), firstRunComplete: account.store.firstRunComplete };
 }
 
 export async function mockLogout(): Promise<void> {
@@ -153,10 +152,11 @@ export async function mockUpdateStore(input: StoreUpdateInput): Promise<StoreRes
   if (input.locale !== undefined) store.locale = input.locale;
   if (input.defaultCurrency !== undefined) store.defaultCurrency = input.defaultCurrency;
   if (input.timezone !== undefined) store.timezone = input.timezone;
+  if (input.completeFirstRun && !store.firstRunComplete) {
+    // Explicit, one-way onboarding completion — mirrors POST /api/store.
+    store.firstRunComplete = true;
+  }
   account.store = store;
-  // ponytail: saving the store region completes the first run here; the real
-  // backend owns this rule (no dedicated endpoint exists in the contract).
-  account.firstRunComplete = true;
   return { store, version: store.version };
 }
 
