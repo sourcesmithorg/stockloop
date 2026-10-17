@@ -1740,6 +1740,11 @@ input[type=file]::file-selector-button {
   display:grid;
   gap:24px
 }
+/* App-specific addition, not present in the reference:
+   .settings-grid's wrapper div floors at the members table's 640px min-width
+   (grid items default to min-width:auto), which widens the page at narrow
+   viewports. The reference has no content that wide, so it never needs this. */
+.settings-grid>div{min-width:0}
 .settings-menu {
   display:flex;
   gap:8px;

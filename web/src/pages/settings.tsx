@@ -41,9 +41,23 @@ export function SettingsPage() {
       />
       {store && preferences ? (
         <div className="settings-grid">
-          <RegionForm initialPreferences={preferences} initialStore={store} />
-          <MembersSection />
-          <AccountSection />
+          {/* .template/settings.html #settings-menu: nav fills the 170px
+              column; sections flow down column 2. Anchors only for sections
+              this app actually renders — never dead links. */}
+          <nav aria-label="Settings sections" className="settings-menu">
+            <a href="#region">Region &amp; language</a>
+            <a href="#members">Members</a>
+            <a href="#account">Your account</a>
+          </nav>
+          {/* Reference structure (.template/settings.html:516): the sections
+              live in ONE wrapper div, so the grid has exactly two children
+              (nav + wrapper) and no section can ever land in the 170px nav
+              track via auto-placement wrap. */}
+          <div>
+            <RegionForm initialPreferences={preferences} initialStore={store} />
+            <MembersSection />
+            <AccountSection />
+          </div>
         </div>
       ) : (
         <p className="small muted">Loading settings…</p>
@@ -495,9 +509,15 @@ function AccountSection() {
       // destination is the public landing page.
       navigate('/');
     } catch (caught) {
-      // The server could not confirm the sign-out, so nothing was cleared —
-      // say so instead of pretending the user signed out.
-      setError(caught instanceof Error ? caught.message : 'Could not sign out.');
+      // The server could not confirm the sign-out, so nothing was cleared.
+      // ALWAYS state the consequence first; append the server detail for
+      // diagnosis. Network-layer failures can carry an EMPTY message — never
+      // a silent no-op, and raw status text alone never tells the user
+      // whether they are still signed in.
+      const detail = caught instanceof Error ? caught.message.trim() : '';
+      setError(
+        `Sign-out did not happen — you are still signed in.${detail !== '' ? ` (${detail})` : ''}`,
+      );
     } finally {
       setSigningOut(false);
     }
@@ -534,10 +554,10 @@ function AccountSection() {
           Sign out
         </Button>
       </div>
-      {/* aria-live only, no role: RegionForm's save status owns role="status"
+      {/* aria-live kept; no role: RegionForm's save status owns role="status"
           on this page, and getByRole must stay unambiguous. */}
-      <div aria-live="polite" className="small muted mt-24">
-        {error ?? ''}
+      <div aria-live="polite" className="mt-24">
+        {error != null && <InlineNote tone="bad">{error}</InlineNote>}
       </div>
     </section>
   );

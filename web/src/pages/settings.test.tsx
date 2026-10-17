@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// Real stylesheets for the rule assertion (vitest css:true) — same as
+// inventory.test.tsx's focus-ring check.
+import '@/styles/cornerstore.css';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -133,14 +136,19 @@ describe('settings account section and sign-out', () => {
     await expect(mockApi.me()).rejects.toThrow();
   }, 20_000);
 
-  it('a failed sign-out is surfaced and does not pretend to have signed out', async () => {
+  it('a failed sign-out states the consequence even when the server sends a message', async () => {
     await seedRegistration('owner-signout-fail@example.test');
     vi.spyOn(api, 'logout').mockRejectedValue(new ApiError(502, '502 Bad Gateway on /auth/logout'));
     renderSettingsRoutes();
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: /Sign out/ }));
-    const status = await screen.findByText(/502 Bad Gateway on \/auth\/logout/);
-    expect(status).toBeInTheDocument();
+    // Consequence first — raw status text alone never tells the user whether
+    // they are still signed in; the server detail is appended for diagnosis.
+    expect(
+      await screen.findByText(
+        'Sign-out did not happen — you are still signed in. (502 Bad Gateway on /auth/logout)',
+      ),
+    ).toBeInTheDocument();
     // Session kept: still on settings, still signed in (scoped to #account —
     // the members table lists the same email).
     const heading = screen.getByRole('heading', { level: 2, name: 'Your account' });
@@ -149,5 +157,75 @@ describe('settings account section and sign-out', () => {
     expect(
       within(section as HTMLElement).getByText('owner-signout-fail@example.test'),
     ).toBeInTheDocument();
+  }, 20_000);
+
+  it('renders the settings section nav with anchors only for sections that exist', async () => {
+    await seedRegistration('owner-nav@example.test');
+    renderSettings();
+    const nav = await screen.findByRole('navigation', { name: 'Settings sections' });
+    const hrefs = within(nav)
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href') ?? '');
+    // Every nav anchor resolves to a section this app renders — no dead links.
+    expect(hrefs).toEqual(['#region', '#members', '#account']);
+    for (const href of hrefs) {
+      expect(document.getElementById(href.slice(1))).not.toBeNull();
+    }
+  }, 20_000);
+
+  it('keeps the settings grid at exactly two children (nav + wrapper) like the reference', async () => {
+    await seedRegistration('owner-grid@example.test');
+    renderSettings();
+    const nav = await screen.findByRole('navigation', { name: 'Settings sections' });
+    const grid = nav.parentElement as HTMLElement | null;
+    expect(grid).not.toBeNull();
+    expect(grid?.className).toContain('settings-grid');
+    // Reference structure (.template/settings.html:501-516): the grid holds
+    // ONLY the nav and one wrapper div holding every section. A third direct
+    // child would wrap a section into the 170px nav track.
+    const children = Array.from(grid?.children ?? []);
+    expect(children).toHaveLength(2);
+    expect(children[0]).toBe(nav);
+    expect(children[1].tagName).toBe('DIV');
+    expect(children[1].querySelectorAll('section')).toHaveLength(3);
+  }, 20_000);
+
+  it('lets the settings wrapper shrink below the members table min-width (narrow-viewport overflow)', async () => {
+    await seedRegistration('owner-overflow@example.test');
+    renderSettings();
+    const nav = await screen.findByRole('navigation', { name: 'Settings sections' });
+    const wrapper = nav.parentElement?.children[1] as HTMLElement;
+    expect(wrapper).toBeTruthy();
+    // jsdom has no layout engine, so grid min-content flooring cannot be
+    // observed here — the shipped rule text is the authority (same pattern as
+    // the inventory focus-ring test). The browser pass measures real overflow.
+    const ruleShipped = Array.from(document.styleSheets).some((sheet) => {
+      try {
+        return Array.from(sheet.cssRules).some((rule) => {
+          // Whitespace-normalized so the check is independent of how the
+          // CSSOM serializer spaces the authored `.settings-grid>div`.
+          const text = rule.cssText.replace(/\s+/g, '');
+          return text.includes('.settings-grid>div') && text.includes('min-width:0');
+        });
+      } catch {
+        return false;
+      }
+    });
+    expect(ruleShipped).toBe(true);
+    // And it applies to this wrapper: computed min-width resolves to 0.
+    expect(['0', '0px']).toContain(window.getComputedStyle(wrapper).minWidth);
+  }, 20_000);
+
+  it('a failed sign-out with an empty error message still tells the user the truth', async () => {
+    await seedRegistration('owner-signout-empty@example.test');
+    // Network-layer failures can carry an empty message — the old code rendered
+    // a silent no-op. The fallback must state the consequence.
+    vi.spyOn(api, 'logout').mockRejectedValue(new TypeError(''));
+    renderSettingsRoutes();
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Sign out/ }));
+    expect(await screen.findByText(/Sign-out did not happen/)).toBeInTheDocument();
+    expect(screen.getByText(/still signed in/)).toBeInTheDocument();
+    // Session kept: still on settings.
+    expect(screen.getByRole('heading', { level: 2, name: 'Your account' })).toBeInTheDocument();
   }, 20_000);
 });
