@@ -6,8 +6,9 @@ import { usePageTitle } from '@/lib/use-page-title';
 
 import { PlaceholderPage } from './placeholder';
 
-export { ImportsPage } from './imports';
+export { AssistantPage } from './assistant';
 export { InventoryPage } from './inventory';
+export { ImportsPage } from './imports';
 export { LandingPage } from './landing';
 export { LoginPage } from './login';
 export { OnboardingPage } from './onboarding';

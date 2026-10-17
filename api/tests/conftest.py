@@ -28,6 +28,10 @@ os.environ["DATABASE_URL"] = (
 os.environ["STOCKLOOP_TODAY"] = "2026-10-13"
 os.environ.pop("GEMINI_API_KEY", None)
 os.environ.pop("GOOGLE_CLOUD_PROJECT", None)
+# AI gateway env never reaches tests: provider selection is monkeypatched.
+os.environ.pop("NINEROUTER_URL", None)
+os.environ.pop("NINEROUTER_API_KEY", None)
+os.environ.pop("AI_MODEL", None)
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient

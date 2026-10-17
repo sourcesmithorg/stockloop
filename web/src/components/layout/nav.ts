@@ -14,6 +14,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { to: '/orders', label: 'Purchase orders', icon: 'i-file' },
   { to: '/suppliers', label: 'Suppliers', icon: 'i-truck' },
   { to: '/imports', label: 'Data imports', icon: 'i-upload' },
+  { to: '/assistant', label: 'Assistant', icon: 'i-help' },
 ];
 
 export const SECONDARY_NAV: NavItem[] = [

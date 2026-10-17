@@ -16,6 +16,8 @@ import logging
 import queue
 import re
 import threading
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal, cast
@@ -166,8 +168,74 @@ class GeminiProvider:
             return None
 
 
-def select_provider(settings: Settings) -> tuple[GeminiProvider | None, str | None]:
-    """Return (provider, None) when callable, else (None, safe not-configured reason)."""
+class NineRouterProvider:
+    """OpenAI-compatible provider for the 9router gateway.
+
+    POST {NINEROUTER_URL}/v1/chat/completions with bearer auth from
+    NINEROUTER_API_KEY (header omitted when the gateway runs with auth
+    disabled), JSON response mode, temperature 0 and a token cap. Some
+    gateway builds append an SSE-style "data: [DONE]" trailer; parsing
+    decodes the first JSON document and ignores the rest.
+    """
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    def generate(self, prompt: str, timeout_s: float) -> str:
+        base = (self.settings.ninerouter_url or "").rstrip("/")
+        payload = {
+            "model": self.settings.ai_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+            "temperature": 0,
+            "max_tokens": MAX_OUTPUT_TOKENS,
+        }
+        headers = {"Content-Type": "application/json"}
+        if self.settings.ninerouter_api_key:
+            headers["Authorization"] = f"Bearer {self.settings.ninerouter_api_key}"
+        request = urllib.request.Request(
+            f"{base}/v1/chat/completions",
+            data=json.dumps(payload).encode(),
+            headers=headers,
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_s) as response:
+                raw = response.read()
+        except urllib.error.HTTPError as exc:
+            # classify_error maps 401/403 to auth and 429 to quota from the message.
+            raise RuntimeError(f"{exc.code} {exc.reason}") from exc
+        return self._extract_content(raw)
+
+    @staticmethod
+    def _extract_content(raw: bytes) -> str:
+        body = raw.decode("utf-8", errors="replace")
+        start = body.find("{")
+        if start < 0:
+            raise ValueError("gateway returned no JSON object")
+        document, _ = json.JSONDecoder().raw_decode(body[start:])
+        choices = document.get("choices") or [{}]
+        message = choices[0].get("message") or {}
+        refusal = message.get("refusal")
+        if refusal:
+            raise ValueError(f"refusal: {refusal}")
+        content = message.get("content")
+        if not content or not str(content).strip():
+            raise ValueError("model returned empty output")
+        return str(content).strip()
+
+
+AiProvider = GeminiProvider | NineRouterProvider
+
+
+def select_provider(settings: Settings) -> tuple[AiProvider | None, str | None]:
+    """Return (provider, None) when callable, else (None, safe not-configured reason).
+
+    Route order: the 9router gateway when NINEROUTER_URL is set, then the
+    Gemini routes (API key, then a billed Vertex project).
+    """
+    if settings.ninerouter_url:
+        return NineRouterProvider(settings), None
     if settings.gemini_api_key:
         return GeminiProvider(settings, "api-key"), None
     if settings.google_cloud_project:
@@ -184,7 +252,7 @@ def select_provider(settings: Settings) -> tuple[GeminiProvider | None, str | No
     )
 
 
-def _generate_with_timeout(provider: GeminiProvider, prompt: str, timeout_s: float) -> str:
+def _generate_with_timeout(provider: AiProvider, prompt: str, timeout_s: float) -> str:
     """Bound the call: the daemon thread cannot wedge the request; queue timeout wins."""
     results: queue.Queue[tuple[str, object]] = queue.Queue(maxsize=1)
 
@@ -194,7 +262,7 @@ def _generate_with_timeout(provider: GeminiProvider, prompt: str, timeout_s: flo
         except BaseException as exc:  # noqa: BLE001 — all provider errors fall back
             results.put(("err", exc))
 
-    threading.Thread(target=run, name="gemini-generate", daemon=True).start()
+    threading.Thread(target=run, name="ai-generate", daemon=True).start()
     try:
         kind, value = results.get(timeout=timeout_s + 0.5)
     except queue.Empty as exc:
@@ -213,6 +281,8 @@ def classify_error(exc: BaseException) -> str:
     low = message.lower()
     if isinstance(exc, ProviderTimeout):
         return str(exc)
+    if isinstance(exc, TimeoutError) or "timed out" in low:
+        return f"timeout: {name}"
     if "billing" in low:
         return f"billing-disabled: {name}"
     if "429" in message or "resourceexhausted" in name.lower() or "quota" in low:

@@ -36,6 +36,12 @@ class Settings:
     # delivered Oct-2026 fixture arithmetic stays reproducible on any machine clock.
     today_override: date | None
     gemini_api_key: str | None
+    # 9router gateway (OpenAI-compatible). When the URL is set it takes
+    # precedence over the Gemini route for AI calls; the key is optional
+    # (omitted only when the gateway runs with auth disabled).
+    ninerouter_url: str | None
+    ninerouter_api_key: str | None
+    ai_model: str
     secret_key: str
     environment: str
 
@@ -44,8 +50,9 @@ def get_settings() -> Settings:
     today_raw = os.environ.get("STOCKLOOP_TODAY") or None
     project = os.environ.get("GOOGLE_CLOUD_PROJECT") or None
     api_key = os.environ.get("GEMINI_API_KEY") or None
-    # Default to the verified working model; GEMINI_MODEL overrides.
+    # Default to the gateway's cheapest verified worker; AI_MODEL overrides.
     model = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
+    ai_model = os.environ.get("AI_MODEL") or "tiny-worker"
     return Settings(
         database_url=os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL,
         web_origins=tuple(
@@ -57,6 +64,9 @@ def get_settings() -> Settings:
         google_cloud_region=os.environ.get("GOOGLE_CLOUD_REGION") or "us-central1",
         gemini_model=model,
         gemini_api_key=api_key,
+        ninerouter_url=os.environ.get("NINEROUTER_URL") or None,
+        ninerouter_api_key=os.environ.get("NINEROUTER_API_KEY") or None,
+        ai_model=ai_model,
         store_id=os.environ.get("STOCKLOOP_STORE_ID") or None,
         today_override=date.fromisoformat(today_raw) if today_raw else None,
         secret_key=os.environ.get("SECRET_KEY") or "change-me-locally",

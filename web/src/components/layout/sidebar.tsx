@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { STORE } from '@/lib/mock/fixtures';
 
 import { Icon } from './icon';
+import { LogoutButton } from './logout-button';
 import { NavLinks } from './nav-links';
 import { PRIMARY_NAV, SECONDARY_NAV } from './nav';
 
@@ -69,6 +70,7 @@ export function Sidebar() {
             </span>
           </Link>
         )}
+        <LogoutButton />
       </div>
     </aside>
   );

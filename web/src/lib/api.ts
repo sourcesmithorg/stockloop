@@ -493,6 +493,32 @@ export interface AiExplainResponse {
   explanations: AiExplanation[];
 }
 
+export interface AiAskInput {
+  question: string;
+  language?: string;
+}
+
+export interface AiCitation {
+  field: string;
+  value: string;
+}
+
+export interface AiProposal {
+  productId: string | null;
+  title: string;
+  field: string;
+  currentValue: string;
+  proposedValue: string;
+}
+
+export interface AiAskResponse {
+  answer: string;
+  citations: AiCitation[];
+  proposals: AiProposal[];
+  requestId: string;
+  notice: string;
+}
+
 export interface HealthResponse {
   status: 'ok' | 'degraded';
   db: { reachable: boolean; latencyMs: number | null; error: string | null };
@@ -633,6 +659,7 @@ export interface ApiClient {
   getOrderExports(id: string): Promise<ExportAttempt[]>;
   previewImport(input: PreviewImportInput): Promise<ImportPreview>;
   commitImport(importId: string): Promise<ImportResult>;
+  ask(input: AiAskInput): Promise<AiAskResponse>;
   explain(input: ExplainInput): Promise<AiExplainResponse>;
   login(input: AuthCredentials): Promise<AuthResult>;
   register(input: RegisterInput): Promise<AuthResult>;
@@ -720,6 +747,7 @@ export const httpApi: ApiClient = {
   },
   commitImport: (importId) =>
     request(`/imports/${encodeURIComponent(importId)}/commit`, { method: 'POST' }),
+  ask: (input) => request('/ai/ask', post(input)),
   explain: (input) => request('/ai/explain', post(input)),
   login: (input) => request('/auth/login', post(input)),
   register: (input) => request('/auth/register', post(input)),

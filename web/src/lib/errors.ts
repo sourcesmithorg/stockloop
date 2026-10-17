@@ -8,6 +8,8 @@ export interface ApiErrorDetail {
   message?: string;
   field?: string;
   currentVersion?: number;
+  /** Provider-failure reason carried by AI endpoints (e.g. "refusal: ..."). */
+  reason?: string;
 }
 
 export class ApiError extends Error {
@@ -15,6 +17,7 @@ export class ApiError extends Error {
   readonly code?: string;
   readonly field?: string;
   readonly currentVersion?: number;
+  readonly reason?: string;
 
   constructor(status: number, message: string, detail?: ApiErrorDetail) {
     super(detail?.message ?? message);
@@ -23,6 +26,7 @@ export class ApiError extends Error {
     this.code = detail?.code;
     this.field = detail?.field;
     this.currentVersion = detail?.currentVersion;
+    this.reason = detail?.reason;
   }
 }
 

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import io
 import json
+import os
 import time
 from dataclasses import replace
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -259,3 +262,146 @@ def test_unknown_context_404s(client: TestClient) -> None:
     assert client.post("/api/ai/explain", json={"productId": "nope"}).status_code == 404
     assert client.post("/api/ai/explain", json={"planId": "nope"}).status_code == 404
     assert client.post("/api/ai/explain", json={}).status_code == 422
+
+
+def test_settings_pick_up_ai_env() -> None:
+    os.environ["AI_MODEL"] = "env-model"
+    try:
+        assert get_settings().ai_model == "env-model"
+    finally:
+        os.environ.pop("AI_MODEL", None)
+    assert get_settings().ai_model == "tiny-worker"  # documented default
+
+
+def test_select_provider_uses_ninerouter_when_url_configured() -> None:
+    base = get_settings()
+    settings = replace(
+        base,
+        ninerouter_url="http://router.invalid:20128",
+        ninerouter_api_key=None,
+        gemini_api_key=None,
+        google_cloud_project=None,
+    )
+    provider, reason = ai_module.select_provider(settings)
+    assert reason is None
+    assert isinstance(provider, ai_module.NineRouterProvider)
+
+
+def test_select_provider_falls_back_to_gemini_without_ninerouter() -> None:
+    base = get_settings()
+    settings = replace(
+        base,
+        ninerouter_url=None,
+        ninerouter_api_key=None,
+        gemini_api_key="unit-test-key",
+        google_cloud_project=None,
+    )
+    provider, reason = ai_module.select_provider(settings)
+    assert reason is None
+    assert isinstance(provider, ai_module.GeminiProvider)
+    assert provider.route == "api-key"
+
+
+class _FakeHttp:
+    """Stand-in for urllib.request.urlopen's response object."""
+
+    def __init__(self, payload: bytes):
+        self._payload = payload
+
+    def read(self) -> bytes:
+        return self._payload
+
+    def __enter__(self) -> _FakeHttp:
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        return None
+
+
+def _ninerouter_settings(**overrides: Any) -> Any:
+    params: dict[str, Any] = {
+        "ninerouter_url": "http://router.invalid:20128",
+        "ninerouter_api_key": "unit-test-key",
+        "ai_model": "tiny-worker",
+    }
+    params.update(overrides)
+    return replace(get_settings(), **params)
+
+
+def test_ninerouter_provider_posts_openai_chat_completions(monkeypatch: Any) -> None:
+    import urllib.request
+
+    captured: dict[str, Any] = {}
+
+    def fake_urlopen(request: Any, timeout: float) -> _FakeHttp:
+        captured["url"] = request.full_url
+        captured["method"] = request.get_method()
+        captured["body"] = json.loads(request.data)
+        captured["timeout"] = timeout
+        captured["auth"] = request.get_header("Authorization")
+        return _FakeHttp(
+            b'{"id":"gen-1","choices":[{"index":0,"message":{"role":"assistant",'
+            b'"content":"{\\"ok\\":true}"}}]}data: [DONE]\n\n'
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    provider = ai_module.NineRouterProvider(_ninerouter_settings())
+
+    text = provider.generate("Say ok", 5.0)
+
+    assert text == '{"ok":true}'
+    assert captured["url"] == "http://router.invalid:20128/v1/chat/completions"
+    assert captured["method"] == "POST"
+    assert captured["auth"] == "Bearer unit-test-key"
+    assert captured["timeout"] == 5.0
+    assert captured["body"]["model"] == "tiny-worker"
+    assert captured["body"]["messages"] == [{"role": "user", "content": "Say ok"}]
+    assert captured["body"]["response_format"] == {"type": "json_object"}
+
+
+def test_ninerouter_provider_omits_auth_header_without_key(monkeypatch: Any) -> None:
+    import urllib.request
+
+    captured: dict[str, Any] = {}
+
+    def fake_urlopen(request: Any, timeout: float) -> _FakeHttp:
+        captured["auth"] = request.get_header("Authorization")
+        return _FakeHttp(b'{"choices":[{"message":{"content":"{}"}}]}')
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    provider = ai_module.NineRouterProvider(_ninerouter_settings(ninerouter_api_key=None))
+
+    assert provider.generate("hi", 5.0) == "{}"
+    assert captured["auth"] is None
+
+
+def test_ninerouter_provider_maps_http_errors(monkeypatch: Any) -> None:
+    import urllib.error
+    import urllib.request
+
+    def fake_urlopen(request: Any, timeout: float) -> _FakeHttp:
+        raise urllib.error.HTTPError(
+            request.full_url, 429, "Too Many Requests", {}, io.BytesIO(b'{"error":"quota"}')
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    provider = ai_module.NineRouterProvider(_ninerouter_settings())
+
+    with pytest.raises(RuntimeError, match="429"):
+        provider.generate("hi", 5.0)
+
+
+def test_ninerouter_provider_flags_refusal(monkeypatch: Any) -> None:
+    import urllib.request
+
+    def fake_urlopen(request: Any, timeout: float) -> _FakeHttp:
+        return _FakeHttp(
+            b'{"choices":[{"message":{"role":"assistant","content":null,'
+            b'"refusal":"I cannot help with that"}}]}'
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    provider = ai_module.NineRouterProvider(_ninerouter_settings())
+
+    with pytest.raises(ValueError, match="refusal"):
+        provider.generate("hi", 5.0)

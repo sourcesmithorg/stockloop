@@ -14,6 +14,7 @@ import {
   ORDER_DETAILS,
   ORDERS,
   PRODUCTS,
+  RISK_VIEWS,
   SALES_SERIES,
   SUPPLIERS,
 } from './fixtures';
@@ -491,6 +492,42 @@ export const mockApi: ApiClient = {
       planVersion: plan?.version ?? null,
       productId: input.productId ?? null,
       explanations,
+    };
+  },
+
+  async ask() {
+    // Demo-mode deterministic reply over the shipped fixture snapshot.
+    const oat = PRODUCTS[0];
+    const oatRisk = RISK_VIEWS[0];
+    const oatLine = DRAFT_PLAN.lines[0];
+    const stock = oatRisk.stock.kind === 'known' ? oatRisk.stock.value : 'unknown';
+    const cover = oatRisk.coverDays.kind === 'finite' ? oatRisk.coverDays.value : 'unknown';
+    return {
+      answer:
+        `Oat milk has ${stock} on hand with ${cover} days of cover. ` +
+        `The current plan suggests ${oatLine.originalSuggestedBaseUnits} units for a ` +
+        `${oatLine.lineTotal} USD line.`,
+      citations: [
+        { field: `products.${oat.id}.stockQuantity`, value: stock },
+        { field: `products.${oat.id}.coverDays`, value: cover },
+        {
+          field: `plan.lines.${oat.id}.originalSuggestedBaseUnits`,
+          value: String(oatLine.originalSuggestedBaseUnits),
+        },
+        { field: `plan.lines.${oat.id}.lineTotal`, value: String(oatLine.lineTotal) },
+      ],
+      proposals: [
+        {
+          productId: oat.id,
+          title: 'Raise oat milk to 60 units',
+          field: `plan.lines.${oat.id}.editedUnits`,
+          currentValue: 'none',
+          proposedValue: '60',
+        },
+      ],
+      requestId: `demo-${Math.random().toString(36).slice(2, 8)}`,
+      notice:
+        'Advisory only — nothing was changed. Suggestions are drafts; applying one goes through the normal reorder review screen.',
     };
   },
 

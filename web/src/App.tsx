@@ -4,6 +4,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { Button } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
+  AssistantPage,
   ImportMappingPage,
   ImportResultPage,
   ImportValidationPage,
@@ -11,8 +12,8 @@ import {
   InventoryPage,
   LandingPage,
   LoginPage,
-  NotFoundPage,
   OnboardingPage,
+  NotFoundPage,
   OrdersPage,
   OrderDetailPage,
   OverviewPage,
@@ -86,6 +87,7 @@ function AppRoutes() {
       <Route path="onboarding" element={<OnboardingPage />} />
       <Route element={<AppShell />}>
         <Route path="overview" element={<OverviewPage />} />
+        <Route path="assistant" element={<AssistantPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="inventory/:productId" element={<ProductPage />} />
         <Route path="reorder" element={<ReorderPage />} />

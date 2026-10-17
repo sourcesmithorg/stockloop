@@ -56,6 +56,9 @@ export function OverviewPage() {
       <PageHead
         actions={
           <>
+            <Link className={buttonClass()} to="/assistant">
+              Ask StockLoop
+            </Link>
             <Link className={buttonClass()} to="/imports">
               Import data
             </Link>

@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { USE_MOCK } from '@/lib/api';
+import { ChatProvider } from '@/lib/chat';
 
 import { AppHeader } from './app-header';
+import { ChatWidget } from '@/components/chat/chat-widget';
 import { IconSprite } from './icon';
 import { MobileNav } from './mobile-nav';
 import { Sidebar } from './sidebar';
@@ -26,27 +28,30 @@ export function AppShell() {
   }, [pathname]);
 
   return (
-    <>
-      <a className="skip-link" href="#main-content">
-        Skip to content
-      </a>
-      <IconSprite />
-      <Sidebar />
-      <MobileNav />
-      <div className="app-main">
-        <AppHeader />
-        <main className="main" id="main-content" tabIndex={-1}>
-          <Outlet />
-          <footer className="page-footer">
-            <span>
-              {USE_MOCK
-                ? 'StockLoop demo · fixture data only — nothing here is a real order.'
-                : 'Live store data from this store — nothing is ordered without your approval.'}
-            </span>
-            <span>Deterministic rules · human review</span>
-          </footer>
-        </main>
-      </div>
-    </>
+    <ChatProvider>
+      <>
+        <a className="skip-link" href="#main-content">
+          Skip to content
+        </a>
+        <IconSprite />
+        <Sidebar />
+        <MobileNav />
+        <div className="app-main">
+          <AppHeader />
+          <main className="main" id="main-content" tabIndex={-1}>
+            <Outlet />
+            <footer className="page-footer">
+              <span>
+                {USE_MOCK
+                  ? 'StockLoop demo · fixture data only — nothing here is a real order.'
+                  : 'Live store data from this store — nothing is ordered without your approval.'}
+              </span>
+              <span>Deterministic rules · human review</span>
+            </footer>
+          </main>
+        </div>
+        <ChatWidget />
+      </>
+    </ChatProvider>
   );
 }

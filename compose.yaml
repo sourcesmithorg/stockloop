@@ -33,6 +33,11 @@ services:
       GOOGLE_CLOUD_REGION: ${GOOGLE_CLOUD_REGION:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # 9router OpenAI-compatible gateway. Set on the host only (gitignored):
+      # NINEROUTER_URL, NINEROUTER_API_KEY, AI_MODEL (default tiny-worker).
+      NINEROUTER_URL: ${NINEROUTER_URL:-}
+      NINEROUTER_API_KEY: ${NINEROUTER_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
     depends_on:
       db:
         condition: service_healthy

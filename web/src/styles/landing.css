@@ -1,0 +1,298 @@
+/* StockLoop | Public landing page — NOT part of the Cornerstore port.
+   cornerstore.css is a verbatim port of .template/assets/styles.css and stays
+   untouched; this file only adds landing-scoped layout (lp- prefix) built from
+   the same :root tokens. The reference kit has no marketing screen, so there is
+   nothing here to reproduce — only to not contradict. Rules:
+   - fixed rem steps (media-query breakpoints), never fluid display type;
+   - tokens only for color/radius/spacing — no new palette, no gradients;
+   - one accent (terracotta) earns its place on actions, nothing decorative. */
+
+.landing {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.lp-shell {
+  width: 100%;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+
+/* ---- header ---- */
+
+.lp-header {
+  border-block-end: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.lp-header .lp-shell {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-block: 10px;
+}
+
+.lp-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.065em;
+  color: var(--color-ink);
+}
+
+.lp-brand img {
+  display: block;
+  width: 33px;
+  height: 33px;
+}
+
+.lp-header nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---- hero ---- */
+
+.lp-hero {
+  display: grid;
+  gap: 32px;
+  padding-block: 48px;
+}
+
+.lp-hero-copy {
+  min-width: 0;
+}
+
+.lp-hero h1 {
+  margin-block: 8px 16px;
+  font-size: 1.75rem;
+}
+
+.lp-lead {
+  max-width: 60ch;
+  font-size: 1rem;
+  color: var(--color-muted);
+}
+
+.lp-cta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-block-start: 24px;
+}
+
+.lp-hero-art {
+  min-width: 0;
+  margin: 0;
+}
+
+.lp-hero-art img {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  margin-inline: auto;
+}
+
+.lp-hero-art figcaption {
+  margin-block-start: 8px;
+  font-size: 0.6875rem;
+  color: var(--color-muted);
+  text-align: center;
+}
+
+/* ---- sections ---- */
+
+.lp-section {
+  padding-block: 40px;
+  border-block-start: 1px solid var(--color-border);
+}
+
+.lp-section h2 {
+  font-size: 1.25rem;
+}
+
+.lp-prose {
+  max-width: 68ch;
+  margin-block-start: 12px;
+}
+
+.lp-prose p + p {
+  margin-block-start: 12px;
+}
+
+/* How it works — reuses .welcome-list / .step-num from the port. */
+
+.lp-steps {
+  margin-block-start: 24px;
+}
+
+.lp-steps h3 {
+  font-size: 1rem;
+}
+
+/* Principles and limits — bordered rows, no card grid. */
+
+.lp-rows {
+  display: grid;
+  gap: 0;
+  margin-block-start: 20px;
+  max-width: 72ch;
+}
+
+.lp-rows > li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding-block: 16px;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.lp-rows > li:last-child {
+  border-block-end: 0;
+}
+
+.lp-rows .icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-block-start: 2px;
+  color: var(--color-primary);
+}
+
+.lp-rows h3 {
+  font-size: 1rem;
+  margin-block-end: 4px;
+}
+
+.lp-rows p {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+/* Real screens — description list in the .facts register. */
+
+.lp-screens {
+  display: grid;
+  gap: 0;
+  margin-block-start: 20px;
+}
+
+.lp-screens > div {
+  display: grid;
+  gap: 2px;
+  padding-block: 14px;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.lp-screens > div:last-child {
+  border-block-end: 0;
+}
+
+.lp-screens dt {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.lp-screens dd {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  max-width: 60ch;
+}
+
+/* ---- closing + footer ---- */
+
+.lp-closing {
+  padding-block: 48px;
+  border-block-start: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.lp-closing h2 {
+  font-size: 1.375rem;
+  margin-block-end: 8px;
+}
+
+.lp-closing p {
+  max-width: 52ch;
+  color: var(--color-muted);
+}
+
+.lp-footer {
+  border-block-start: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.lp-footer .lp-shell {
+  display: flex;
+  gap: 8px 24px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding-block: 20px;
+}
+
+/* ---- wide screens ---- */
+
+@media (min-width: 900px) {
+  .lp-hero {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    align-items: center;
+    gap: 48px;
+    padding-block: 64px;
+  }
+
+  .lp-hero h1 {
+    font-size: 2.5rem;
+  }
+
+  .lp-hero-art {
+    order: 2;
+  }
+
+  .lp-hero-art img {
+    margin-inline: 0 0;
+  }
+
+  .lp-hero-art figcaption {
+    text-align: start;
+  }
+
+  .lp-section {
+    padding-block: 56px;
+  }
+
+  .lp-section h2 {
+    font-size: 1.375rem;
+  }
+
+  .lp-screens {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 48px;
+  }
+}
+
+/* ---- small screens: template convention (fixed steps, 20px gutters) ---- */
+
+@media (max-width: 599px) {
+  .lp-hero {
+    padding-block: 32px;
+  }
+
+  .lp-lead {
+    font-size: 1rem;
+  }
+}

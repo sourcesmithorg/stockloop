@@ -505,6 +505,37 @@ class AiExplainResponse(BaseModel):
     explanations: list[AiExplanation]
 
 
+class AiAskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    language: str | None = None
+
+
+class AiCitation(BaseModel):
+    """One figure quoted from the server snapshot: source field + its value."""
+
+    field: str
+    value: str
+
+
+class AiProposal(BaseModel):
+    """Inert draft change the owner could make. Carries the value it would
+    change; applying it goes through the normal review screen. Never executed."""
+
+    productId: str | None = None
+    title: str
+    field: str
+    currentValue: str
+    proposedValue: str
+
+
+class AiAskResponse(BaseModel):
+    answer: str
+    citations: list[AiCitation] = Field(default_factory=list)
+    proposals: list[AiProposal] = Field(default_factory=list)
+    requestId: str
+    notice: str
+
+
 # --------------------------------------------------------------------------- auth & account
 
 

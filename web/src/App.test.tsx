@@ -68,4 +68,17 @@ describe('routing and shell invariants', () => {
     renderAt('/gone');
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
+
+  it('opens the chat from the menu without a chatbot-first home', () => {
+    renderAt('/overview');
+    expect(screen.getAllByRole('link', { name: 'Assistant' }).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('Your question')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('A little foresight.');
+  });
+
+  it('renders the assistant route as one panel with one h1', () => {
+    renderAt('/assistant');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Ask StockLoop');
+  });
 });
