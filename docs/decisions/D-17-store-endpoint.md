@@ -1,4 +1,4 @@
-Decision ID: D-07 (store endpoint — ID collides with the register's D-07 "stock snapshot replace versus movement/merge"; kept as instructed, owner should renumber one of the two on review)
+Decision ID: D-17 (renumbered from D-07 — the delivered register already assigns D-07 to "stock snapshot replace versus movement/merge semantics")
 Status: proposed — implemented provisionally
 Owner and source/date: unassigned — proposed by the M2 implementation agent, 2026-10-16; awaiting owner confirmation.
 Question: What is the contract of `GET/POST /api/store` — payload shape, field naming, concurrency control, role gating, and what happens to existing documents when the region fields change?
