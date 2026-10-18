@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { api } from '@/lib/api';
@@ -6,8 +6,10 @@ import { ApiError } from '@/lib/errors';
 import {
   answerToMessage,
   createConversation,
+  deleteConversation,
   loadChatDocument,
   newMessageId,
+  renameConversation,
   saveConversation,
   setCurrentConversation,
   type ChatConversation,
@@ -24,10 +26,12 @@ export interface ChatContextValue {
   busy: boolean;
   minimized: boolean;
   setMinimized(value: boolean): void;
-  send(question: string, base?: ChatConversation): Promise<void>;
+  send(question: string, base?: ChatConversation, options?: { file?: File }): Promise<boolean>;
   retryLast(): Promise<void>;
   newConversation(): void;
   switchTo(id: string): void;
+  rename(id: string, title: string): void;
+  remove(id: string): void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -56,10 +60,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setCurrent(next);
   }, []);
 
+  // Last sent file, in memory only: a failed exchange retries with the same
+  // attachment; file bytes never reach localStorage or the persisted history.
+  const failedFile = useRef<File | null>(null);
   const send = useCallback(
-    async (question: string, base?: ChatConversation) => {
+    async (question: string, base?: ChatConversation, options?: { file?: File }) => {
       const text = question.trim();
-      if (!text || busy) return;
+      if (!text || busy) return false;
       setBusy(true);
       const conversation = base ?? current ?? createConversation();
       const now = Date.now();
@@ -72,14 +79,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           { id: newMessageId(), role: 'user', content: text, createdAt: now },
         ],
       };
+      failedFile.current = options?.file ?? null;
       persist(withUser);
       try {
-        const answer = await api.ask({ question: text });
+        const answer = await api.ask({ question: text, file: options?.file });
         persist({
           ...withUser,
           updatedAt: Date.now(),
           messages: [...withUser.messages, answerToMessage(newMessageId(), answer)],
         });
+        return true;
       } catch (error) {
         const refusal = error instanceof ApiError && (error.reason ?? '').startsWith('refusal');
         const message =
@@ -106,6 +115,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       } finally {
         setBusy(false);
       }
+      return false;
     },
     [busy, current, persist],
   );
@@ -119,7 +129,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (last?.role !== 'assistant' || !last.error || before?.role !== 'user') return;
     const base = { ...conversation, messages: conversation.messages.slice(0, -2) };
     persist(base);
-    await send(before.content, base);
+    await send(before.content, base, { file: failedFile.current ?? undefined });
   }, [busy, current, persist, send]);
 
   const newConversation = useCallback(() => {
@@ -135,6 +145,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setCurrent(document.conversations.find((item) => item.id === id) ?? null);
   }, []);
 
+  const rename = useCallback((id: string, title: string) => {
+    renameConversation(id, title);
+    const document = loadChatDocument();
+    setConversations(document.conversations);
+    if (document.currentId === id)
+      setCurrent(document.conversations.find((item) => item.id === id) ?? null);
+  }, []);
+
+  const remove = useCallback((id: string) => {
+    deleteConversation(id);
+    const document = loadChatDocument();
+    setConversations(document.conversations);
+    setCurrent(document.conversations.find((item) => item.id === document.currentId) ?? null);
+  }, []);
+
   const value = useMemo(
     () => ({
       conversations,
@@ -146,8 +171,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       retryLast,
       newConversation,
       switchTo,
+      rename,
+      remove,
     }),
-    [conversations, current, busy, minimized, send, retryLast, newConversation, switchTo],
+    [
+      conversations,
+      current,
+      busy,
+      minimized,
+      send,
+      retryLast,
+      newConversation,
+      switchTo,
+      rename,
+      remove,
+    ],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

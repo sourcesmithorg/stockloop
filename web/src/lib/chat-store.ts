@@ -104,6 +104,15 @@ export function deleteConversation(id: string): void {
   writeDocument(document);
 }
 
+/** Renames in place; blank titles keep the existing title (80-char cap). */
+export function renameConversation(id: string, title: string): void {
+  const document = readDocument();
+  const conversation = document.conversations.find((item) => item.id === id);
+  const next = title.trim().slice(0, 80);
+  if (conversation && next) conversation.title = next;
+  writeDocument(document);
+}
+
 export function setCurrentConversation(id: string | null): void {
   const document = readDocument();
   document.currentId = id;

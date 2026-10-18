@@ -8,13 +8,13 @@ export interface NavItem {
 
 /** Navigation order is fixed by .docs/UI-UX-GUIDE.md: settings stays secondary. */
 export const PRIMARY_NAV: NavItem[] = [
+  { to: '/assistant', label: 'Assistant', icon: 'i-help' },
   { to: '/overview', label: 'Overview', icon: 'i-grid', end: true },
   { to: '/inventory', label: 'Inventory', icon: 'i-box' },
   { to: '/reorder', label: 'Reorder studio', icon: 'i-spark' },
   { to: '/orders', label: 'Purchase orders', icon: 'i-file' },
   { to: '/suppliers', label: 'Suppliers', icon: 'i-truck' },
   { to: '/imports', label: 'Data imports', icon: 'i-upload' },
-  { to: '/assistant', label: 'Assistant', icon: 'i-help' },
 ];
 
 export const SECONDARY_NAV: NavItem[] = [

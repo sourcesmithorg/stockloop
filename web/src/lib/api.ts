@@ -496,6 +496,8 @@ export interface AiExplainResponse {
 export interface AiAskInput {
   question: string;
   language?: string;
+  /** Textual attachment (≤200 KB, .txt/.md/.csv/.json); bytes never leave the request. */
+  file?: File;
 }
 
 export interface AiCitation {
@@ -747,7 +749,14 @@ export const httpApi: ApiClient = {
   },
   commitImport: (importId) =>
     request(`/imports/${encodeURIComponent(importId)}/commit`, { method: 'POST' }),
-  ask: (input) => request('/ai/ask', post(input)),
+  ask: (input) => {
+    if (!input.file) return request('/ai/ask', post(input));
+    const body = new FormData();
+    body.append('question', input.question);
+    if (input.language) body.append('language', input.language);
+    body.append('file', input.file);
+    return requestForm('/ai/ask', body);
+  },
   explain: (input) => request('/ai/explain', post(input)),
   login: (input) => request('/auth/login', post(input)),
   register: (input) => request('/auth/register', post(input)),

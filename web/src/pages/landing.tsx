@@ -10,101 +10,76 @@ import '@/styles/landing.css';
 /**
  * Public landing at `/` — standalone home page, not the auth frame. Reachable
  * only for unauthenticated visitors (the guard sends authenticated `/` into
- * the app). Every claim below is checkable in this repo: deterministic rules
+ * the app). Copy is deliberately short (owner: "bit minimalist, less
+ * explanation"); every claim stays checkable in this repo: deterministic rules
  * (api/app/domain/calculations.py), unknown≠zero (web/src/lib/risk-display.ts,
  * api/app/risk.py), immutable approval snapshots (api/app/plans.py,
  * api/app/routers/orders.py), advisory-only AI (api/app/services/ask.py),
  * export-is-not-send (api/app/routers/exports.py). No invented counts,
- * testimonials, scores, savings, or prices — the reference kit ships no
- * marketing screen, so this page composes only Cornerstore tokens and assets.
+ * testimonials, scores, savings, or prices.
  */
 
-const HOW_STEPS = [
+/** Optional body: only step 4 carries one — approval binding is the claim a
+ * label alone cannot hold. The other labels stand alone (owner: brevity). */
+const HOW_STEPS: { body?: string; title: string }[] = [
+  { title: 'Import your data' },
+  { title: 'See what’s at risk' },
+  { title: 'Review the restock plan' },
   {
-    body: 'Upload your products, sales history, and stock counts. Every row is validated before anything is trusted — bad rows come back with a reason, not a shrug.',
-    title: 'Import what you already have',
-  },
-  {
-    body: 'Each product gets a plain-language state: out of stock, at risk, running low, stale data, or healthy — with the numbers behind it one click away.',
-    title: 'See what is actually at risk',
-  },
-  {
-    body: 'Demand window, stock cover, safety stock, target days, pack rounding, and supplier minimums — computed the same way every time, with the reasoning shown.',
-    title: 'Review the restock plan',
-  },
-  {
-    body: 'Approving binds those exact numbers to an immutable version. If the inputs change later, the plan needs re-checking and re-approving — no silent edits.',
+    body: 'Approval freezes the numbers — later edits need re-approval.',
     title: 'You approve every purchase',
   },
-  {
-    body: 'Each supplier gets one purchase-order document built from your approved snapshot — packs, base units, currency, and provenance intact.',
-    title: 'Order from the approved copy',
-  },
-] as const;
+  { title: 'Order from the approved copy' },
+];
 
 const PRINCIPLES = [
   {
-    body: 'The purchasing math is plain Python: demand window, stock cover, safety days, pack rounding, minimum orders. Same inputs, same answer — no guessing, no hidden model in the loop.',
+    body: 'Same inputs, same answer — plain Python, no hidden model in the loop.',
     title: 'Deterministic rules decide eligibility',
   },
   {
-    body: 'Missing sales history reads “No history”, not zero. A verified zero reads a real “0 / day”. Missing stock reads “Unknown”. Empty data stays empty — it never pretends to be a measurement.',
+    body: 'Missing history reads “No history”; verified zero reads “0 / day”.',
     title: 'Unknown is not zero',
   },
   {
-    body: 'Totals are grouped per supplier and per currency. Currencies are never added into one misleading number, and historical money is never re-labelled.',
+    body: 'Totals stay per supplier and per currency — currencies are never added into one number.',
     title: 'Money keeps its currency',
   },
   {
-    body: 'The AI can explain a recommendation and propose ideas, but every figure it quotes is checked against your store’s real numbers first. A reply that invents a figure is rejected before you ever see it.',
+    body: 'Every figure it quotes is checked against your real numbers — invented figures are rejected.',
     title: 'AI explains — it never decides',
   },
 ] as const;
 
 const LIMITS = [
   {
-    body: 'No scheduled buying, no auto-reorders, no “smart” checkout. Every purchase starts as a proposal and ends with your approval.',
+    body: 'No auto-reorders, no scheduled buying. Every purchase ends with your approval.',
     title: 'Nothing buys autonomously',
   },
   {
-    body: 'The model cannot approve a plan, export a purchase order, or change your data. Those code paths are not reachable from the AI.',
+    body: 'The model cannot approve, export, or change your data.',
     title: 'AI gets no last word',
   },
   {
-    body: 'Unknown, stale, zero-sales, and measured data are four different states and stay four different states — everywhere in the app.',
+    body: 'Unknown, stale, zero-sales, and measured stay four distinct states.',
     title: 'Missing data is never smoothed over',
   },
   {
-    body: '“Export ready” means a file was produced on your request. StockLoop never emails suppliers and never claims an order was accepted or delivered.',
+    body: '“Export ready” means a file exists — StockLoop never emails suppliers.',
     title: 'Export is not email',
   },
 ] as const;
 
 const SCREENS = [
+  { description: 'Store snapshot and today’s priority table.', name: 'Overview' },
+  { description: 'Every product with its risk state.', name: 'Inventory' },
+  { description: 'Build a plan, review its reasoning.', name: 'Reorder studio' },
   {
-    description: 'Your store’s snapshot and a priority table of what needs a look today.',
-    name: 'Overview',
-  },
-  {
-    description: 'Every product with its risk state and the data behind it.',
-    name: 'Inventory',
-  },
-  {
-    description: 'Build a restock plan and review the reasoning line by line.',
-    name: 'Reorder studio',
-  },
-  {
-    description: 'Approved snapshots — one purchase-order document per supplier.',
+    description: 'One document per supplier, from your approved snapshot.',
     name: 'Purchase orders',
   },
-  {
-    description: 'Who you buy from, with terms and per-currency totals.',
-    name: 'Suppliers',
-  },
-  {
-    description: 'Uploads validated row by row before anything is trusted.',
-    name: 'Data imports',
-  },
+  { description: 'Your suppliers, with terms and per-currency totals.', name: 'Suppliers' },
+  { description: 'Uploads validated row by row.', name: 'Data imports' },
 ] as const;
 
 export function LandingPage() {
@@ -125,9 +100,7 @@ export function LandingPage() {
             <p className="eyebrow">Inventory purchasing copilot</p>
             <h1 id="landing-hero">Know what to order, before you run out.</h1>
             <p className="lp-lead">
-              StockLoop is built for owner-operated neighborhood shops. It reads your stock and
-              sales, works out what needs ordering with transparent rules, and hands you a restock
-              plan to review. You approve every purchase — nothing buys on its own.
+              Your stock and sales become a restock plan you approve. Nothing buys on its own.
             </p>
             <div className="lp-cta-row">
               <Link className={buttonClass('primary')} to="/register">
@@ -147,9 +120,7 @@ export function LandingPage() {
               src="/shelf.svg"
               width={420}
             />
-            <figcaption>
-              Built around the shop you actually run — not a warehouse, not a spreadsheet.
-            </figcaption>
+            <figcaption>Built for the shop you run — not a warehouse.</figcaption>
           </figure>
         </section>
 
@@ -159,14 +130,8 @@ export function LandingPage() {
             <h2 id="landing-problem">Ordering from memory is a gamble.</h2>
             <div className="lp-prose">
               <p>
-                Between supplier minimums, pack sizes, seasonal swings, and a shelf full of little
-                SKUs, the next order is rarely obvious. Order too little and the shelf is empty.
-                Order too much and your cash sits in the stockroom.
-              </p>
-              <p>
-                Spreadsheets help until they don’t — the numbers go stale, and nobody trusts the
-                sheet at the moment it matters. StockLoop replaces the guesswork with a plan you can
-                read, question, and approve.
+                Supplier minimums, pack sizes, and seasonal swings make the next order hard to
+                guess. StockLoop replaces the guess with a plan you can read.
               </p>
             </div>
           </div>
@@ -182,7 +147,7 @@ export function LandingPage() {
                   <span className="step-num">{index + 1}</span>
                   <div className="grow">
                     <h3>{step.title}</h3>
-                    <p>{step.body}</p>
+                    {step.body && <p>{step.body}</p>}
                   </div>
                 </li>
               ))}
@@ -194,10 +159,6 @@ export function LandingPage() {
         <section aria-labelledby="landing-principles" className="lp-section">
           <div className="lp-shell">
             <h2 id="landing-principles">Numbers you can argue with.</h2>
-            <p className="lp-prose">
-              A purchasing tool is only worth its arithmetic. These four rules are built into the
-              code, not painted on top of it.
-            </p>
             <ul className="lp-rows">
               {PRINCIPLES.map((principle) => (
                 <li key={principle.title}>
@@ -216,9 +177,6 @@ export function LandingPage() {
         <section aria-labelledby="landing-limits" className="lp-section">
           <div className="lp-shell">
             <h2 id="landing-limits">What it deliberately does not do.</h2>
-            <p className="lp-prose">
-              The short list of things we refuse to fake is the strongest promise this page makes.
-            </p>
             <ul className="lp-rows">
               {LIMITS.map((limit) => (
                 <li key={limit.title}>
@@ -238,7 +196,7 @@ export function LandingPage() {
           <div className="lp-shell">
             <h2 id="landing-screens">The screens you get today.</h2>
             <p className="lp-prose">
-              Not a roadmap — the working product, each screen fed by live reads from your own data.
+              Not a roadmap — every screen fed by live reads of your own data.
             </p>
             <dl className="lp-screens">
               {SCREENS.map((screen) => (
@@ -254,8 +212,8 @@ export function LandingPage() {
         {/* ---- closing ---- */}
         <section aria-labelledby="landing-cta" className="lp-closing">
           <div className="lp-shell">
-            <h2 id="landing-cta">Your next order, worked out before you sit down to it.</h2>
-            <p>Set up your store, import your data, and review your first restock plan.</p>
+            <h2 id="landing-cta">Your next order, worked out.</h2>
+            <p>Set up your store, import your data, review your first plan.</p>
             <div className="lp-cta-row">
               <Link className={buttonClass('primary')} to="/register">
                 <Icon name="i-right" />

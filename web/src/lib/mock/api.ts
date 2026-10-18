@@ -495,7 +495,22 @@ export const mockApi: ApiClient = {
     };
   },
 
-  async ask() {
+  async ask(input) {
+    if (input.file) {
+      // Upload fixture: echo the first figure found in the file so the client
+      // can prove file bytes flow through without touching persistence.
+      const text = await input.file.text();
+      const figure = text.match(/\d+(?:\.\d+)?/)?.[0];
+      const number = figure ?? '0';
+      return {
+        answer: `Your upload lists ${number} — from your upload, not your store.`,
+        citations: [{ field: 'file.upload.firstFigure', value: number }],
+        proposals: [],
+        requestId: `demo-${Math.random().toString(36).slice(2, 8)}`,
+        notice:
+          'Advisory only — nothing was changed. The uploaded file was read to answer; it is not saved.',
+      };
+    }
     // Demo-mode deterministic reply over the shipped fixture snapshot.
     const oat = PRODUCTS[0];
     const oatRisk = RISK_VIEWS[0];

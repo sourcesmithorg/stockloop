@@ -25,6 +25,7 @@ RUN uv sync --frozen --no-dev
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
+COPY prompts ./prompts
 
 # Make the project venv (uvicorn, alembic, app) the default PATH.
 ENV PATH="/app/.venv/bin:$PATH"
